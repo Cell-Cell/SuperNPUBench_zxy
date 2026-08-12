@@ -1,0 +1,24 @@
+   114c8: 0800         	C.BSTART.STD	
+   114ca: 81f2a467     	bic	a3, 32, 32, 	->a6
+   114ce: 00437f95     	slli	a4, 4, 	->t
+   114d2: 010c0f95     	addi	t#1, 16, 	->t
+   114d6: 05803a05     	or	zero, t#1.uw, 	->x0
+   114da: 4916         	c.movi	4, 	->a7
+
+00000000000114dc <.LBB1_14>:
+   114dc: 0004         	C.BSTART.STD	COND, 0x114dc <.LBB1_14>
+   114de: 00002f87     	addtpc	2, 	->t
+   114e2: 1aac0f95     	addi	t#1, 426, 	->t
+   114e6: 108c6f89     	lwu	[t#1, a6<<2], 	->t
+   114ea: 0bdc2fe7     	bic	t#1, 2, 62, 	->t
+   114ee: 029c6fc5     	cmp.ltu	t#1, a7.sw, 	->t
+   114f2: 525c         	c.sext.w	a7, ->t
+   114f4: c98d04f7     	csel	t#2, t#3, t#1, 	->a7
+   114f8: 00140415     	addi	a6, 1, 	->a6
+   114fc: 01446065     	setc.ltu	a6, x0
+   11500: fe44         	C.BSTART.STD	COND, 0x114c8 <.LBB1_13>
+   11502: 1491af89     	lw	[a1, a7.uw<<2], 	->t
+   11506: 0e0c         	c.addi	t#1, 1, ->t
+   11508: c491a049     	sw	t#1, [a1, a7.uw<<2]
+   1150c: 00438395     	addi	a5, 4, 	->a5
+   11510: 51dc         	c.sext.w	a5, ->t

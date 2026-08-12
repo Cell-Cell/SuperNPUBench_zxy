@@ -1,0 +1,10 @@
+M78950  |TPC:0x114d6  I4     T0 L0  |x0:0xffffffffffffffef      |zero:0x0                   |[t#1.not]:0xffffffffffffffef|                           |or zero, [t#1.not] -> x0 |bin: 0x5803a05
+M78960  |TPC:0x114f8  I8     T0 L0  |a6:0x1                     |a6:0x0                     |0x1                        |                           |addi a6, 0x1 -> a6 |bin: 0x140415
+M78961  |TPC:0x114fc  I9     T0 L0  |None                       |a6:0x1                     |[x0.sw]:0xffffffffffffffef |                           |setc.ltu a6, [x0.sw] |bin: 0x1446065
+M78971  |TPC:0x114f8  I8     T0 L0  |a6:0x2                     |a6:0x1                     |0x1                        |                           |addi a6, 0x1 -> a6 |bin: 0x140415
+M78972  |TPC:0x114fc  I9     T0 L0  |None                       |a6:0x2                     |[x0.sw]:0xffffffffffffffef |                           |setc.ltu a6, [x0.sw] |bin: 0x1446065
+M78982  |TPC:0x114f8  I8     T0 L0  |a6:0x3                     |a6:0x2                     |0x1                        |                           |addi a6, 0x1 -> a6 |bin: 0x140415
+M78983  |TPC:0x114fc  I9     T0 L0  |None                       |a6:0x3                     |[x0.sw]:0xffffffffffffffef |                           |setc.ltu a6, [x0.sw] |bin: 0x1446065
+M78993  |TPC:0x114f8  I8     T0 L0  |a6:0x4                     |a6:0x3                     |0x1                        |                           |addi a6, 0x1 -> a6 |bin: 0x140415
+M78994  |TPC:0x114fc  I9     T0 L0  |None                       |a6:0x4                     |[x0.sw]:0xffffffffffffffef |                           |setc.ltu a6, [x0.sw] |bin: 0x1446065
+M79004  |TPC:0x114f8  I8     T0 L0  |a6:0x5                     |a6:0x4                     |0x1                        |                           |addi a6, 0x1 -> a6 |bin: 0x140415

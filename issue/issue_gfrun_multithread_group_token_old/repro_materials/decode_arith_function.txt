@@ -1,0 +1,33 @@
+static InstInfo* DecodeInst32_extract_arith(InstInfo *inst, uint32_t bin)
+{
+    inst->src0 = DecodeUtiles::Extract32(bin, 15, 5);
+    inst->src0Type = 0;
+    inst->src1 = DecodeUtiles::Extract32(bin, 20, 5);
+    inst->src1Type = 0;
+    inst->srcRType = DecodeUtiles::Extract32(bin, 25, 2);
+    inst->src2 = DecodeUtiles::Extract32(bin, 27, 5);
+    inst->src2Type = 2;
+    inst->dst0 = DecodeUtiles::Extract32(bin, 7, 5);
+    inst->dst0Type = 0;
+    return inst;
+}
+
+static InstInfo* DecodeInst32_extract_arith_si(InstInfo *inst, uint32_t bin)
+{
+    inst->src0 = DecodeUtiles::Extract32(bin, 15, 5);
+    inst->src0Type = 0;
+    inst->src1Type = 1;
+    inst->dst0 = DecodeUtiles::Extract32(bin, 7, 5);
+    inst->dst0Type = 0;
+    return inst;
+}
+
+static InstInfo* DecodeInst32_extract_arith_ui(InstInfo *inst, uint32_t bin)
+{
+    inst->src0 = DecodeUtiles::Extract32(bin, 15, 5);
+    inst->src0Type = 0;
+    inst->src1 = DecodeUtiles::Extract32(bin, 20, 12);
+    inst->src1Type = 2;
+    inst->dst0 = DecodeUtiles::Extract32(bin, 7, 5);
+    inst->dst0Type = 0;
+    return inst;

@@ -1,0 +1,6 @@
+Thread:0Total Block number = 467239
+Thread:0Total Inst number = 2969765
+
+Total Block number = 467239
+Total Inst number = 2969765
+Suaccelss to Reach the End of Benchmark! R2 = 2af8

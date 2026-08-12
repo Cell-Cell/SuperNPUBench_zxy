@@ -1,0 +1,23 @@
+=== Environment Information ===
+
+SuperScalarModel:
+  repo: /mnt/workspace/gitCode/cann/Dev-experience/v300_0811/SuperScalarModel
+69177439 Merge pull request #118 from LinxISA/cleanup/delete-v3-placeholder-stubs-104
+
+linx-toolchain-build:
+  TileOP-API: bb625b9 [tileop-api] Encode TSize directly from per-PE tile size (drop 4-PE divisor)
+  LLVM: 2a4648d08088 [LinxV5] Encode B.IOT TSize directly from tile type size
+
+Compiler:
+clang version 15.0.4 (linx64v5-musl-local 2a4648d08088fff104479cacfff2607fabcdd2f5)
+Target: linx64v5-unknown-linux-musl
+Thread model: posix
+InstalledDir: /mnt/workspace/gitCode/cann/Dev-experience/v300_0811/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin
+
+PEID fix present:
+    SYS_PEID = 0x802,
+    {SystemReg::SYS_PEID, "peid"},
+
+Host:
+Linux 6cc5ad4517be4c1298999c433dbebb67 5.10.0-182.0.0.95.r3450_282.hce2.aarch64 #1 SMP Fri Jun 5 14:50:01 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+gcc: gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0

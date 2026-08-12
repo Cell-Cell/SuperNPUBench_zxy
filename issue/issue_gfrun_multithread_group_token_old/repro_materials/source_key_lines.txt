@@ -1,0 +1,36 @@
+11:static constexpr uint32_t kThreadsPerBlock = 4;
+42:    uint32_t *cntLocal,            // [kThreadsPerBlock * kExpertNum]
+46:    const uint32_t tid = get_thread_idx();
+55:    for (uint32_t i = tid; i < topkEleNum; i += kThreadsPerBlock) {
+64:    uint32_t expertsPerPE = expertNum / kThreadsPerBlock;
+68:        for (uint32_t t = 0; t < kThreadsPerBlock; t++) {
+85://   groupedTokenIds:   [expertPerRank][kThreadsPerBlock][bs/kThreadsPerBlock]
+86://   tokenSuperPodInfo: [expertPerRank][kThreadsPerBlock][bs/kThreadsPerBlock][superPodNum]
+87://   expertSectionTokenCnt: [expertPerRank][kThreadsPerBlock]  (per-PE counts)
+94:    uint32_t *perPegroupedIds,        // [kExpertPerRank * kThreadsPerBlock * kBS_per_PE]
+95:    uint32_t *perPeSectionCnt,        // [kExpertPerRank * kThreadsPerBlock]
+96:    uint32_t *perPePodInfo,           // [kExpertPerRank * kThreadsPerBlock * kBS_per_PE * kSuperPodNum]
+103:    const uint32_t tid = get_thread_idx();
+104:    constexpr uint32_t kBsPerPE = kBS / kThreadsPerBlock;  // 128
+119:    for (uint32_t i = tid; i < batchSize; i += kThreadsPerBlock) {
+134:        uint32_t peOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE
+138:        uint32_t podPeOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE * superPodNum
+161:    constexpr uint32_t kBsPerPE = kBS / kThreadsPerBlock;
+165:        for (uint32_t t = 0; t < kThreadsPerBlock; t++) {
+168:                uint32_t peOffset = s * kThreadsPerBlock * kBsPerPE
+172:                uint32_t podPeOffset = s * kThreadsPerBlock * kBsPerPE * superPodNum
+202:    const uint32_t tid = get_thread_idx();
+205:    for (uint32_t i = tid; i < batchSize; i += kThreadsPerBlock) {
+306:#ifndef __linx
+309:           kBS, kTopK, kExpertPerRank, kExpertNum, kThreadsPerBlock);
+323:    constexpr uint32_t kBsPerPE = kBS / kThreadsPerBlock;  // 128
+324:    static uint32_t cntLocal[kThreadsPerBlock * kExpertNum];
+325:    static uint32_t perPegroupedIds[kExpertPerRank * kThreadsPerBlock * kBsPerPE];
+326:    static uint32_t perPeSectionCnt[kExpertPerRank * kThreadsPerBlock];
+327:    static uint32_t perPePodInfo[kExpertPerRank * kThreadsPerBlock * kBsPerPE * kSuperPodNum];
+341:    for (uint32_t i = 0; i < kExpertPerRank * kThreadsPerBlock; i++) perPeSectionCnt[i] = 0;
+343:    BENCHSTART;
+367:    BENCHEND;
+369:#ifdef __linx
+370:    return 0;
+441:#ifndef __linx

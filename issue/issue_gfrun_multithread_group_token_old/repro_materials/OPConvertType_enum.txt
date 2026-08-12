@@ -1,0 +1,78 @@
+enum class OPConvertType {
+    /* OPCVT_S64 need be 0 for 32inst decode */
+    OPCVT_DW = -2,  /* as d */
+    OPCVT_NOT,
+    OPCVT_NEG,
+    OPCVT_FP64,      // e11m52
+    OPCVT_FP32,      // e8m23
+    OPCVT_TF32,      // e8m10
+    OPCVT_HF32,      // e8m11
+    OPCVT_FP16,      // e5m10
+    OPCVT_BF16,      // e8m7
+    OPCVT_HIF8,      // Generic custom structure
+    OPCVT_FP8,       // e4m3
+    OPCVT_FP8_1,     // e5m2
+    OPCVT_FP6,       // e3m2
+    OPCVT_FP6_1,     // e2m3
+    OPCVT_FP4,       // e2m1
+    OPCVT_FP4_1,     // e1m2
+    OPCVT_SF8,       // e8m0
+    OPCVT_HIF4,      // Generic custom structure e1m2
+    OPCVT_E6M2,
+    OPCVT_S4,
+    OPCVT_S8,
+    OPCVT_S16,
+    OPCVT_S32,
+    OPCVT_S64,
+    OPCVT_U4,
+    OPCVT_U8,
+    OPCVT_U16,
+    OPCVT_U32,
+    OPCVT_U64,
+    OPCVT_HIF4_X_2,
+    OPCVT_FP16_X_2,
+    OPCVT_BF16_X_2,
+    OPCVT_E4M3_X_4,
+    OPCVT_U16_X_2,
+    OPCVT_U8_X_4,
+    OPCVT_S16_X_2,
+    OPCVT_S8_X_4,
+    OPCVT_E1M2_X_2,
+    OPCVT_NO_CVT,
+    OPCVT_COUNT,
+};
+
+inline const std::unordered_map<OPConvertType, std::string>& OPCVTTypeNames()
+{
+    static const std::unordered_map<OPConvertType, std::string> OPCVT_NAMES = {{
+        {OPConvertType::OPCVT_DW, ".d",},
+        {OPConvertType::OPCVT_NOT, ".not"},
+        {OPConvertType::OPCVT_NEG, ".neg"},
+        {OPConvertType::OPCVT_FP64, ".fd"},
+        {OPConvertType::OPCVT_FP32, ".fs"},
+        {OPConvertType::OPCVT_TF32, ".tfs"},
+        {OPConvertType::OPCVT_HF32, ".hfs"},
+        {OPConvertType::OPCVT_FP16, ".fh"},
+        {OPConvertType::OPCVT_BF16, ".bf"},
+        {OPConvertType::OPCVT_HIF8, ".hifb"},
+        {OPConvertType::OPCVT_FP8, ".fb"},
+        {OPConvertType::OPCVT_FP8_1, ".flb"},
+        {OPConvertType::OPCVT_FP6, ".f6(e3m2)"},
+        {OPConvertType::OPCVT_FP6_1, ".f6(e2m3)"},
+        {OPConvertType::OPCVT_FP4, ".f4(e2m1)"},
+        {OPConvertType::OPCVT_FP4_1, ".f4(e1m2)"},
+        {OPConvertType::OPCVT_SF8, ".sfb"},
+        {OPConvertType::OPCVT_HIF4, ".hif4"},
+        {OPConvertType::OPCVT_S4, ".s4"},
+        {OPConvertType::OPCVT_S8, ".s8"},
+        {OPConvertType::OPCVT_S16, ".sh"},
+        {OPConvertType::OPCVT_S32, ".sw"},
+        {OPConvertType::OPCVT_S64, ".sd"},
+        {OPConvertType::OPCVT_U4, ".u4"},
+        {OPConvertType::OPCVT_U8, ".ub"},
+        {OPConvertType::OPCVT_U16, ".uh"},
+        {OPConvertType::OPCVT_U32, ".uw"},
+        {OPConvertType::OPCVT_U64, ".ud"},
+        {OPConvertType::OPCVT_FP16_X_2, "fp16x2"},
+        {OPConvertType::OPCVT_E4M3_X_4, "e4m3x2"},
+        {OPConvertType::OPCVT_U16_X_2, "u16x2"},
