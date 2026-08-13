@@ -2,7 +2,7 @@ template <typename E_, int R_, int C_, int VR_=R_, int VC_=C_>
 using TileAcc = pto::Tile<pto::Location::Vec, E_, R_, C_, pto::BLayout::RowMajor, VR_, VC_>;
 
 // =============================================================================
-// multilayer_recompute_pto.hpp — 多层重算 GEMM 累加链（tile 版）
+// multilayer_recompute.hpp — 多层重算 GEMM 累加链（tile 版）
 // =============================================================================
 //
 // 【功能】

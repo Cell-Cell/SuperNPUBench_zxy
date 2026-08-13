@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/mask_indices_by_tp_pto.hpp"
+#include "deepseek/moe/mask_indices_by_tp.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

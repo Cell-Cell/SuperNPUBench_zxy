@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "reduction/reducemax_colvec_pto.hpp"
+#include "reduction/reducemax_colvec.hpp"
 
 
 #ifndef RDType

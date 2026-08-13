@@ -39,7 +39,7 @@ void pto_flash_softmax_block(CastTile &src_exp, MaxTile &new_max, SumTile &new_s
 
 template <typename OutTile, typename OldTile, typename PvTile, typename ScaleTile>
 void pto_online_update(OutTile &out, OldTile &old_out, PvTile &pv, ScaleTile &scale) {
-    TROWEXPANDMUL(out, old_out, scale);
+    TCOLEXPANDMUL(out, old_out, scale);
     TADD(out, out, pv);
 }
 
@@ -47,12 +47,12 @@ template <typename OutTile, typename SumTile>
 void pto_normalize_by_sum(OutTile &out, SumTile &sum) {
     SumTile inv_sum;
     TRECIP(inv_sum, sum);
-    TROWEXPANDMUL(out, out, inv_sum);
+    TCOLEXPANDMUL(out, out, inv_sum);
 }
 
-template <typename QuantTile, typename SrcTile>
-void pto_quantize_softmax_to_hif4(QuantTile &dst, SrcTile &src) {
-    TQUANT(dst, src);
+template <typename QuantTile, typename SrcTile, typename ScaleTile>
+void pto_quantize_softmax_to_hif4(QuantTile &dst, ScaleTile &scale, SrcTile &src) {
+    TQUANT<QuantType::MXFP4>(dst, src, scale);
 }
 
 template <typename dtype, int Sq, int Skv, int qD, int vD, int kTm, int kTk,
@@ -61,7 +61,6 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
                                     dtype* v_ptr, uint8_t* scale_q,
                                     uint8_t* scale_k, uint8_t* scale_v) {
     static_assert(qD == vD);
-    static constexpr int physicalTm = kTm < 16 ? 16 : kTm;
 
     using gmQ = global_tensor<dtype, RowMajor<Sq, qD / 2>>;
     using gmK = global_tensor<dtype, ColMajor<qD / 2, Skv>>;
@@ -72,15 +71,12 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
     using gmKScale = global_tensor<uint8_t, ColMajor<qD / w_factor, Skv>>;
     using gmVScale = global_tensor<uint8_t, RowMajor<Skv, vD / w_factor>>;
 
-    using tileQ =
-        TileLeft<dtype, physicalTm, (qD == 192 ? 256 : qD) / 2,
-                 kTm, qD / 2>;
+    using tileQ = TileLeft<dtype, kTm, (qD == 192 ? 256 : qD) / 2, kTm, qD / 2>;
     using tileK = TileRight<dtype, (qD == 192 ? 256 : qD) / 2, kTk, qD / 2, kTk>;
     using tileV = TileRight<dtype, kTk, vD>;
 
-    using tileQScale =
-        Tile<Location::Scaling, uint8_t, physicalTm, qD, BLayout::RowMajor,
-             kTm, qD / w_factor, SLayout::NoneBox>;
+    using tileQScale = Tile<Location::Scaling, uint8_t, kTm, qD, BLayout::RowMajor,
+                            kTm, qD / w_factor, SLayout::NoneBox>;
     using tileKScale = Tile<Location::Scaling, uint8_t, qD, kTk, BLayout::ColMajor,
                             qD / w_factor, kTk, SLayout::NoneBox>;
     using tileVScale = Tile<Location::Scaling, uint8_t, kTk, vD, BLayout::RowMajor,
@@ -88,17 +84,15 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
 
     using tileWAcc = TileAcc<float, kTm, kTk>;
     using tileW = Tile<Location::Vec, float, kTm, kTk, BLayout::ColMajor>;
-    using tileWCast =
-        Tile<Location::Vec, casttype, physicalTm, kTk, BLayout::ColMajor,
-             kTm, kTk>;
-    using tilePHif4 = Tile<Location::Vec, __fp4_e1m2x2, 32, kTk / 2,
-                           BLayout::ColMajor, kTm, kTk / 2, SLayout::ColMajor>;
-    using tilePLeft = TileLeft<dtype, 32, kTk, kTm, kTk>;
+    using tileWCast = Tile<Location::Vec, casttype, kTm, kTk, BLayout::ColMajor>;
+    using tilePScale = Tile<Location::Scaling, uint8_t, 1, kTm * kTk / w_factor,
+                            BLayout::RowMajor>;
+    using tilePHif4 = Tile<Location::Vec, __fp4_e1m2x2, kTm, kTk / 2, BLayout::ColMajor>;
+    using tilePLeft = TileLeft<dtype, kTm, kTk>;
 
     using tileOAcc = TileAcc<float, kTm, vD>;
     using tileO = Tile<Location::Vec, float, kTm, vD, BLayout::ColMajor>;
-    using tileOCast = Tile<Location::Vec, dtype, 32, vD / 2,
-                           BLayout::ColMajor, kTm, vD / 2, SLayout::ColMajor>;
+    using tileOCast = Tile<Location::Vec, dtype, kTm, vD / 2, BLayout::ColMajor>;
 
     using tileMax = Tile<Location::Vec, float, kTm, 8, BLayout::ColMajor, kTm, 1>;
     using tileSum = Tile<Location::Vec, float, kTm, 8, BLayout::ColMajor, kTm, 1>;
@@ -134,10 +128,8 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
 
         #pragma clang loop unroll(full)
         for (int x = 0; x < Xdim; ++x) {
-            auto gQ = gIterQ(i + x, 0);
-            auto gQScale = gIterQScale(i + x, 0);
-            TLOAD(tQ[x], gQ);
-            TLOAD(tQScale[x], gQScale);
+            TLOAD(tQ[x], gIterQ(i + x, 0));
+            TLOAD(tQScale[x], gIterQScale(i + x, 0));
         }
 
         tileMax tMax[Xdim];
@@ -150,7 +142,6 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
         for (int x = 0; x < Xdim; ++x) {
             TEXPANDS(tMax[x], -1e30f);
             TEXPANDS(tSum[x], 0.0f);
-            TEXPANDS(tO[x], 0.0f);
         }
 
         for (int j = 0; j < Kb; j += Ydim) {
@@ -159,10 +150,8 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
 
             #pragma clang loop unroll(full)
             for (int y = 0; y < Ydim; ++y) {
-                auto gK = gIterK(0, j + y);
-                auto gKScale = gIterKScale(0, j + y);
-                TLOAD(tK[y], gK);
-                TLOAD(tKScale[y], gKScale);
+                TLOAD(tK[y], gIterK(0, j + y));
+                TLOAD(tKScale[y], gIterKScale(0, j + y));
             }
 
             tileW tW[Xdim][Ydim];
@@ -178,6 +167,7 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
             tileSum tNewSum[Xdim];
             tileWCast tExpW[Xdim][Ydim];
             tilePHif4 tP[Xdim][Ydim];
+            tilePScale tPScale[Xdim][Ydim];
 
             #pragma clang loop unroll(full)
             for (int x = 0; x < Xdim; ++x) {
@@ -185,7 +175,7 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
 
                 #pragma clang loop unroll(full)
                 for (int y = 0; y < Ydim; ++y) {
-                    TROWMAX(tLocalMax[y], tW[x][y]);
+                    TCOLMAX(tLocalMax[y], tW[x][y]);
                 }
 
 #if Ydim == 1
@@ -216,11 +206,11 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
                 tileSum tLocalSum[Ydim];
                 #pragma clang loop unroll(full)
                 for (int y = 0; y < Ydim; ++y) {
-                    TROWEXPANDSUB(tW[x][y], tW[x][y], tNewMax[x]);
+                    TCOLEXPANDSUB(tW[x][y], tW[x][y], tNewMax[x]);
                     TEXP(tW[x][y], tW[x][y]);
-                    TROWSUM(tLocalSum[y], tW[x][y]);
+                    TCOLSUM(tLocalSum[y], tW[x][y]);
                     TCVT(tExpW[x][y], tW[x][y]);
-                    pto_quantize_softmax_to_hif4(tP[x][y], tExpW[x][y]);
+                    pto_quantize_softmax_to_hif4(tP[x][y], tPScale[x][y], tExpW[x][y]);
                 }
 
 #if Ydim == 1
@@ -244,36 +234,28 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
             tileVScale tVScale[Ydim];
             #pragma clang loop unroll(full)
             for (int y = 0; y < Ydim; ++y) {
-                auto gV = gIterV(j + y, 0);
-                auto gVScale = gIterVScale(j + y, 0);
-                TLOAD(tV[y], gV);
-                TLOAD(tVScale[y], gVScale);
+                TLOAD(tV[y], gIterV(j + y, 0));
+                TLOAD(tVScale[y], gIterVScale(j + y, 0));
             }
 
             #pragma clang loop unroll(full)
             for (int x = 0; x < Xdim; ++x) {
-#if Ydim == 1
-                tilePLeft tPLeft;
-                TCVT(tPLeft, tP[x][0]);
-                TMATMUL_MX(tPV[x], tPLeft, tQScale[x], tV[0], tVScale[0]);
-#else
-                tileO tPVSum;
                 #pragma clang loop unroll(full)
                 for (int y = 0; y < Ydim; ++y) {
                     tilePLeft tPLeft;
-                    TCVT(tPLeft, tP[x][y]);
-                    tileO tPVPart;
-                    TMATMUL_MX(tPVPart, tPLeft, tQScale[x], tV[y], tVScale[y]);
+                    TMOV(tPLeft, tP[x][y]);
                     if (y == 0) {
-                        tPVSum = tPVPart;
+                        TMATMUL_MX(tPV[x], tPLeft, tPScale[x][y], tV[y], tVScale[y]);
                     } else {
-                        TADD(tPVSum, tPVSum, tPVPart);
+                        TMATMUL_MX(tPV[x], tPV[x], tPLeft, tPScale[x][y], tV[y], tVScale[y]);
                     }
                 }
-                tPV[x] = tPVSum;
-#endif
 
-                pto_online_update(tO[x], tO[x], tPV[x], tRescale[x]);
+                if (j == 0) {
+                    tO[x] = tPV[x];
+                } else {
+                    pto_online_update(tO[x], tO[x], tPV[x], tRescale[x]);
+                }
             }
 
             #pragma clang loop unroll(full)
@@ -288,8 +270,7 @@ void flash_attention_2d_unroll_hif4(dtype* out_ptr, dtype* q_ptr, dtype* k_ptr,
             tileOCast tOCast;
             pto_normalize_by_sum(tO[x], tSum[x]);
             TCVT(tOCast, tO[x]);
-            auto gO = gIterO(i + x, 0);
-            TSTORE(gO, tOCast);
+            TSTORE(gIterO(i + x, 0), tOCast);
         }
     }
 }

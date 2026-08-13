@@ -6,8 +6,8 @@
 
 | 文件 | 对应 TileKernels | 功能 | 主指令（实际编译版） |
 |------|------------------|------|---------------------|
-| `fused_weight_pto.hpp` | `engram/engram_fused_weight_kernel.py` | bf16×bf16→fp32 权重融合 | `TCVT` + `TMUL` |
-| `engram_hash_pto.hpp` | `engram/engram_hash_kernel.py` | n-gram 哈希嵌入索引 | `TMULS`+`TXOR`+`TREMS`+`TADDS`（int32 hash） |
+| `fused_weight.hpp` | `engram/engram_fused_weight_kernel.py` | bf16×bf16→fp32 权重融合 | `TCVT` + `TMUL` |
+| `engram_hash.hpp` | `engram/engram_hash_kernel.py` | n-gram 哈希嵌入索引 | `TMULS`+`TXOR`+`TREMS`+`TADDS`（int32 hash） |
 
 ## 注
 

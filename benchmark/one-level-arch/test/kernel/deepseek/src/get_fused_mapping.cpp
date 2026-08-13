@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/get_fused_mapping_pto.hpp"
+#include "deepseek/moe/get_fused_mapping.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

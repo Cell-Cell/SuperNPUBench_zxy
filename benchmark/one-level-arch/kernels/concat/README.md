@@ -67,5 +67,5 @@ Tail 变体使用 `ValidCol` 处理非整除列。
 
 | 文件 | 说明 |
 |------|------|
-| `concat_gather_pto.hpp` | Gather 模式 (输出驱动) |
-| `concat_scatter_pto.hpp` | Scatter 模式 (输入驱动) |
+| `concat_gather.hpp` | Gather 模式 (输出驱动) |
+| `concat_scatter.hpp` | Scatter 模式 (输入驱动) |

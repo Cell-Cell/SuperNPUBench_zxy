@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/topk_gate_pto.hpp"
+#include "deepseek/moe/topk_gate.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

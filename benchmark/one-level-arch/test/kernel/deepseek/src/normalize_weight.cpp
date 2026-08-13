@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/normalize_weight_pto.hpp"
+#include "deepseek/moe/normalize_weight.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

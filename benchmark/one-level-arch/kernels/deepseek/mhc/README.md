@@ -7,11 +7,11 @@
 
 | 文件 | 对应 TileKernels | 功能 | 主指令（实际编译版） |
 |------|------------------|------|---------------------|
-| `expand_to_mhc_pto.hpp` | `mhc/expand_kernel.py`（fwd） | token 沿 mhc 维扩展复制 | `TLOAD` + 循环 `TSTORE`（广播写） |
-| `expand_to_mhc_bwd_pto.hpp` | `mhc/expand_kernel.py`（bwd） | 沿 mhc 维求和归约（反向） | `TCVT` + `TCOLSUM` |
-| `sinkhorn_pto.hpp` | `mhc/sinkhorn_kernel.py`（fwd） | 行列交替归一化 | `TROWMAX`+`TROWEXPANDSUB`+`TEXP`+`TROWSUM`+`TADDS`+`TRECIP`+`TROWEXPANDMUL` + `TCOLSUM`+`TCOLEXPANDMUL`（TROWEXPANDDIV 未提供→recip+mul） |
-| `norm_fn_pto.hpp` | `mhc/norm_fn_kernel.py` | RMSNorm + normw 列广播合并 | `TMUL`+`TROWSUM`+牛顿 rsqrt(`TRECIP`+`TMUL`+`TMULS`+`TADDS`)+`TROWEXPANDMUL` / `TCOLEXPANDMUL`（TRSQRT 未提供→牛顿迭代） |
-| `multilayer_recompute_pto.hpp` | `mhc/multilayer_recompute_kernel.py` | 多层重算 GEMM 累加链 | `TMATMUL_ACC`(链式累加)+`ACCCVT`（TileLeft/TileRight/TileAcc） |
+| `expand_to_mhc.hpp` | `mhc/expand_kernel.py`（fwd） | token 沿 mhc 维扩展复制 | `TLOAD` + 循环 `TSTORE`（广播写） |
+| `expand_to_mhc_bwd.hpp` | `mhc/expand_kernel.py`（bwd） | 沿 mhc 维求和归约（反向） | `TCVT` + `TCOLSUM` |
+| `sinkhorn.hpp` | `mhc/sinkhorn_kernel.py`（fwd） | 行列交替归一化 | `TROWMAX`+`TROWEXPANDSUB`+`TEXP`+`TROWSUM`+`TADDS`+`TRECIP`+`TROWEXPANDMUL` + `TCOLSUM`+`TCOLEXPANDMUL`（TROWEXPANDDIV 未提供→recip+mul） |
+| `norm_fn.hpp` | `mhc/norm_fn_kernel.py` | RMSNorm + normw 列广播合并 | `TMUL`+`TROWSUM`+牛顿 rsqrt(`TRECIP`+`TMUL`+`TMULS`+`TADDS`)+`TROWEXPANDMUL` / `TCOLEXPANDMUL`（TRSQRT 未提供→牛顿迭代） |
+| `multilayer_recompute.hpp` | `mhc/multilayer_recompute_kernel.py` | 多层重算 GEMM 累加链 | `TMATMUL_ACC`(链式累加)+`ACCCVT`（TileLeft/TileRight/TileAcc） |
 
 ## 注
 

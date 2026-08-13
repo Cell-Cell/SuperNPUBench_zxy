@@ -31,6 +31,9 @@ echo "  SuperNPUBench Smoke Test — 编译"
 echo "  COMPILER_DIR=$COMPILER_DIR"
 echo "=========================================="
 
+# Ensure output directory exists (make clean fails if output/ is missing)
+mkdir -p "$REPO_ROOT/output"
+
 # --- 1. matmul (CUBE: 基础 GEMM) ---
 smoke "matmul FP32" \
     make -C "$REPO_ROOT/test/kernel/matmul" TESTCASE=matmul TYPE=MASK MODE=MASK_FP32 M=256 N=256 K=256 tM=32 tN=32 tK=32 clean all

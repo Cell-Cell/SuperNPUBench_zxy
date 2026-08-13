@@ -56,4 +56,4 @@ Tail 变体使用 `ValidCol` 处理非整除列。
 
 | 文件 | 说明 |
 |------|------|
-| `gelu_pto.hpp` | GELU 多项式拟合实现 |
+| `gelu.hpp` | GELU 多项式拟合实现 |

@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/engram/fused_weight_pto.hpp"
+#include "deepseek/engram/fused_weight.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

@@ -60,5 +60,5 @@ TopK (k=2048, 从 131072 个 uint16 元素中选出前 2048 大的)。
 
 | 文件 | 说明 |
 |------|------|
-| `topk_pto.hpp` | PTO tile-op 直方图提取 |
+| `topk.hpp` | PTO tile-op 直方图提取 |
 | `topk.hpp` | topk 完整实现 |

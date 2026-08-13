@@ -5,7 +5,7 @@
 #include <cstdio>
 
 #include "fileop.h"
-#include "transpose/transpose_pto.hpp"
+#include "transpose/transpose.hpp"
 
 
 #ifndef DType

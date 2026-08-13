@@ -44,4 +44,4 @@ Tail 处理: rmd_M (行尾)、rmd_N (列尾)、角落 (rmd_M×rmd_N)。
 
 | 文件 | 说明 |
 |------|------|
-| `gather_pto.hpp` | 行索引 gather 实现 |
+| `gather.hpp` | 行索引 gather 实现 |

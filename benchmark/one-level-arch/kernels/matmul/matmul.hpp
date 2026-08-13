@@ -1,5 +1,5 @@
-#ifndef MATMUL_TILEOP_KERNEL_HPP
-#define MATMUL_TILEOP_KERNEL_HPP
+#ifndef MATMUL_KERNEL_HPP
+#define MATMUL_KERNEL_HPP
 
 #include <common/pto_tileop.hpp>
 
@@ -13,19 +13,19 @@ template <typename E_, int R_, int C_, int VR_=R_, int VC_=C_>
 using TileAcc = Tile<Location::Vec, E_, R_, C_, BLayout::RowMajor, VR_, VC_>;
 
 template <is_global_data_v GmOut, is_tile_data_v TileAcc>
-void store_acc_tile_tileop(GmOut &Gout, TileAcc &tAcc){
+void store_acc_tile(GmOut &Gout, TileAcc &tAcc){
     TSTORE(Gout, tAcc);
 }
 
 template <is_global_data_v GmOut, is_tile_data_v TileAcc>
-void store_acc_tile_dynamic_tileop(GmOut &Gout, TileAcc &tAcc, size_t valid_row, size_t valid_col){
+void store_acc_tile_dynamic(GmOut &Gout, TileAcc &tAcc, size_t valid_row, size_t valid_col){
     TSTORE(Gout, tAcc);
 }
 
 // A * B -> C with any shape
 // activation * weight( int8_t->FP16/FP8-> FP32 -> int8_t)
 template <typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
+void matmul_mask(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
 
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
@@ -109,7 +109,7 @@ void matmul_mask_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
           }
         }
         // TSTORE(gC, tCast);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
       if constexpr (rmd_N) {
         auto gC = gCIter(i, Nb);
@@ -150,7 +150,7 @@ void matmul_mask_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
     if constexpr (rmd_M) {
@@ -193,7 +193,7 @@ void matmul_mask_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
       if constexpr (rmd_N) {
         auto gC = gCIter(Mb, Nb);
@@ -234,14 +234,14 @@ void matmul_mask_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
   }
 }
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_frac_tileop(float* dst, dtype* src0, dtype* src1){
+void matmul_frac(float* dst, dtype* src0, dtype* src1){
     using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
     using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
     using gm_shapeC = global_tensor<float, RowMajor<gM, gN>>;
@@ -285,7 +285,7 @@ void matmul_frac_tileop(float* dst, dtype* src0, dtype* src1){
                 TLOAD(tB, gB);
                 TMATMUL_ACC(tACC, tACC, tA, tB);
             }
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
         }
     }
 }
@@ -339,7 +339,7 @@ constexpr ResB find_reuseB(int Nb, int Kb, int MAX_TILE_NUM) {
 }
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseA(float *dst, dtype *src0, dtype *src1){
   // const int MAX_TILE_NUM = gK/tK;
   const int MAX_TILE_NUM = 24;
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
@@ -456,7 +456,7 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
           }
 
           auto gC = gIterC(i*R.m+ii,j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // [m, rmd_N, k]
@@ -506,7 +506,7 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
           }
 
           auto gC = gIterC(i*R.m+ii,Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
       }
@@ -570,7 +570,7 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
             }
           }
           auto gC = gIterC(i+dM*R.m,j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // [rM, rmd_N, k]
@@ -618,7 +618,7 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
             }
           }
           auto gC = gIterC(i+dM*R.m,Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
       }
     }
@@ -678,7 +678,7 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
           }
         }
         auto gC = gIterC(Mb,j);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
 
       // [rmd_M, rmd_N, k]
@@ -726,14 +726,14 @@ void matmul_mask_reuseA_tileop(float *dst, dtype *src0, dtype *src1){
           }
         }
         auto gC = gIterC(Mb,Nb);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
   }// Batch
 }
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseA_OPT(float *dst, dtype *src0, dtype *src1){
   const int MAX_TILE_NUM = 20;
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
@@ -814,7 +814,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
           }
           auto gC = gIterC(row, j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // --- N 余列 (rmd_N) ---
@@ -829,7 +829,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
           }
           auto gC = gIterC(row, Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // Phase B-1: 剩余 K 轴 Full chunks (每块 MAX_TILE_NUM 个 k tile)
@@ -859,7 +859,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
                 else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
               }
               auto gC = gIterC(row, j);
-              store_acc_tile_tileop(gC, tACC);
+              store_acc_tile(gC, tACC);
             }
 
             // --- N 余列 ---
@@ -874,7 +874,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
                 else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
               }
               auto gC = gIterC(row, Nb);
-              store_acc_tile_tileop(gC, tACC);
+              store_acc_tile(gC, tACC);
             }
           }
         }
@@ -903,7 +903,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
             }
             auto gC = gIterC(row, j);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
 
           // --- N 余列 ---
@@ -918,7 +918,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
             }
             auto gC = gIterC(row, Nb);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
 
@@ -938,7 +938,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
             else                  TMATMUL(tACC, tA_rmdK, tB);
             auto gC = gIterC(row, j);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
 
           // --- N 余列 ---
@@ -950,7 +950,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
             else                  TMATMUL(tACC, tA_rmdK, tB);
             auto gC = gIterC(row, Nb);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
 
@@ -985,7 +985,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
           }
           auto gC = gIterC(row, j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         if constexpr (rmd_N) {
@@ -999,7 +999,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
           }
           auto gC = gIterC(row, Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // Phase B-1: Full chunks
@@ -1027,7 +1027,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
                 else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
               }
               auto gC = gIterC(row, j);
-              store_acc_tile_tileop(gC, tACC);
+              store_acc_tile(gC, tACC);
             }
 
             if constexpr (rmd_N) {
@@ -1041,7 +1041,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
                 else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
               }
               auto gC = gIterC(row, Nb);
-              store_acc_tile_tileop(gC, tACC);
+              store_acc_tile(gC, tACC);
             }
           }
         }
@@ -1069,7 +1069,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
             }
             auto gC = gIterC(row, j);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
 
           if constexpr (rmd_N) {
@@ -1083,7 +1083,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
             }
             auto gC = gIterC(row, Nb);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
 
@@ -1102,7 +1102,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
             else                  TMATMUL(tACC, tA_rmdK, tB);
             auto gC = gIterC(row, j);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
 
           if constexpr (rmd_N) {
@@ -1113,7 +1113,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
             else                  TMATMUL(tACC, tA_rmdK, tB);
             auto gC = gIterC(row, Nb);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
 
@@ -1145,7 +1145,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
           else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
         }
         auto gC = gIterC(Mb, j);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
 
       if constexpr (rmd_N) {
@@ -1159,7 +1159,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
           else        TMATMUL_ACC(tACC, tACC, tA_phase0[k], tB);
         }
         auto gC = gIterC(Mb, Nb);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
 
       // Phase B-1: Full chunks (rmd_M 行，A 类型为 tcols)
@@ -1187,7 +1187,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
             }
             auto gC = gIterC(Mb, j);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
 
           if constexpr (rmd_N) {
@@ -1201,7 +1201,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
               else        TMATMUL_ACC(tACC, tACC, tA_chunk[k], tB);
             }
             auto gC = gIterC(Mb, Nb);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -1229,7 +1229,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
           }
           auto gC = gIterC(Mb, j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         if constexpr (rmd_N) {
@@ -1243,7 +1243,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
             else        TMATMUL_ACC(tACC, tACC, tA_tail[k], tB);
           }
           auto gC = gIterC(Mb, Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
       }
 
@@ -1262,7 +1262,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
           if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
           else                  TMATMUL(tACC, tA_rmdK, tB);
           auto gC = gIterC(Mb, j);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         if constexpr (rmd_N) {
@@ -1273,7 +1273,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
           if constexpr (Kb > 0) TMATMUL_ACC(tACC, tACC, tA_rmdK, tB);
           else                  TMATMUL(tACC, tA_rmdK, tB);
           auto gC = gIterC(Mb, Nb);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
       }
     } // rmd_M
@@ -1282,7 +1282,7 @@ void matmul_mask_reuseA_OPT_tileop(float *dst, dtype *src0, dtype *src1){
 
 template<typename dtype, const int gM, const int gN, const int gK,
          const int tM, const int tN, const int tK>
-void matmul_mask_reuseA_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseA_OPT2(float *dst, dtype *src0, dtype *src1){
   constexpr int MAX_TILE_NUM = 14;
 
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
@@ -1714,23 +1714,35 @@ void matmul_mask_reuseA_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
     for (int m = 0; m < Mb; m++) {
       #pragma clang loop unroll(full)
       for (int n = 0; n < Nb; n++) {
+        tile_C_bf16 tC_b;
+        // TMOV_NZ2DN(tC_b, tC_main[m][n]);
         auto gC = gIterC(m, n);
+        // TSTORE(gC, tC_b);
         TSTORE(gC, tC_main[m][n]);
       }
       if constexpr (rmd_N) {
+        tile_C_bf16_trows tC_b;
+        // TMOV_NZ2DN(tC_b, tC_rcol[m]);
         auto gC = gIterC(m, Nb);
         TSTORE(gC, tC_rcol[m]);
+        // TSTORE(gC, tC_b);
       }
     }
     if constexpr (rmd_M) {
       #pragma clang loop unroll(full)
       for (int n = 0; n < Nb; n++) {
+        tile_C_bf16_tcols tC_b;
+        // TMOV_NZ2DN(tC_b, tC_rrow[n]);
         auto gC = gIterC(Mb, n);
         TSTORE(gC,  tC_rrow[n]);
+        // TSTORE(gC, tC_b);
       }
       if constexpr (rmd_N) {
+        tile_C_bf16_tcorner tC_b;
+        // TMOV_NZ2DN(tC_b, tC_corner);
         auto gC = gIterC(Mb, Nb);
         TSTORE(gC, tC_corner);
+        // TSTORE(gC, tC_b);
       }
     }
 
@@ -1739,7 +1751,7 @@ void matmul_mask_reuseA_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
 
 template<typename dtype, const int gM, const int gN, const int gK,
          const int tM, const int tN, const int tK>
-void matmul_mask_reuseB_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseB_OPT2(float *dst, dtype *src0, dtype *src1){
   constexpr int MAX_TILE_NUM = 14;
 
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
@@ -2171,23 +2183,35 @@ void matmul_mask_reuseB_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
     for (int m = 0; m < Mb; m++) {
       #pragma clang loop unroll(full)
       for (int n = 0; n < Nb; n++) {
+        tile_C_bf16 tC_b;
+        // TMOV_NZ2DN(tC_b, tC_main[m][n]);
         auto gC = gIterC(m, n);
+        // TSTORE(gC, tC_b);
         TSTORE(gC, tC_main[m][n]);
       }
       if constexpr (rmd_N) {
+        tile_C_bf16_trows tC_b;
+        // TMOV_NZ2DN(tC_b, tC_rcol[m]);
         auto gC = gIterC(m, Nb);
         TSTORE(gC, tC_rcol[m]);
+        // TSTORE(gC, tC_b);
       }
     }
     if constexpr (rmd_M) {
       #pragma clang loop unroll(full)
       for (int n = 0; n < Nb; n++) {
+        tile_C_bf16_tcols tC_b;
+        // TMOV_NZ2DN(tC_b, tC_rrow[n]);
         auto gC = gIterC(Mb, n);
         TSTORE(gC,  tC_rrow[n]);
+        // TSTORE(gC, tC_b);
       }
       if constexpr (rmd_N) {
+        tile_C_bf16_tcorner tC_b;
+        // TMOV_NZ2DN(tC_b, tC_corner);
         auto gC = gIterC(Mb, Nb);
         TSTORE(gC, tC_corner);
+        // TSTORE(gC, tC_b);
       }
     }
 
@@ -2196,7 +2220,7 @@ void matmul_mask_reuseB_OPT2_tileop(float *dst, dtype *src0, dtype *src1){
 
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseB(float *dst, dtype *src0, dtype *src1){
   const int MAX_TILE_NUM = 24;
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
@@ -2311,7 +2335,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
           }
 
           auto gC = gIterC(j, i*R.n+ii);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // [n, rmd_M, k]
@@ -2362,7 +2386,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
           }
 
           auto gC = gIterC(Mb, i*R.n+ii);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
       }
@@ -2432,7 +2456,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
             }
           }
           auto gC = gIterC(j, i+dN*R.n);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
 
         // [rN, rmd_M, k]
@@ -2484,7 +2508,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
             }
           }
           auto gC = gIterC(Mb, i+dN*R.n);
-          store_acc_tile_tileop(gC, tACC);
+          store_acc_tile(gC, tACC);
         }
       }
     }
@@ -2548,7 +2572,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
           }
         }
         auto gC = gIterC(j, Nb);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
 
       // [rmd_N, rmd_M, k]
@@ -2600,7 +2624,7 @@ void matmul_mask_reuseB_tileop(float *dst, dtype *src0, dtype *src1){
           }
         }
         auto gC = gIterC(Mb,Nb);
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
 
@@ -2638,7 +2662,7 @@ constexpr ResAB find_reuseAB(int Mb, int Nb, int Kb, int MAX_TILE_NUM) {
 
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_reuseAB(float *dst, dtype *src0, dtype *src1){
   const int MAX_TILE_NUM = 24;
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
@@ -2727,7 +2751,7 @@ void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
               }
             }
             auto gC = gIterC(i*R.m+ii,j*R.n+jj);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -2771,7 +2795,7 @@ void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
               }
             }
             auto gC = gIterC(i*R.m+ii,dN*R.n+jj);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -2828,7 +2852,7 @@ void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
               }
             }
             auto gC = gIterC(dM*R.m+ii,j*R.n+jj);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -2872,7 +2896,7 @@ void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
               }
             }
             auto gC = gIterC(dM*R.m+ii,dN*R.n+jj);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -2883,7 +2907,7 @@ void matmul_mask_reuseAB_tileop(float *dst, dtype *src0, dtype *src1){
 
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_multi4_B_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_multi4_B(float *dst, dtype *src0, dtype *src1){
     using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
     using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
     using gm_shapeC = global_tensor<float, RowMajor<gM, gN>>;
@@ -2911,11 +2935,14 @@ void matmul_mask_multi4_B_tileop(float *dst, dtype *src0, dtype *src1){
           tile_shapeB tB[Kb][4];
 
           for(int k=0;k<Kb;k++){
-            #pragma clang loop unroll(full)
-            for(int jj=0;jj<4;jj++){
-              auto gB = gIterB(k,j+jj);
-              TLOAD(tB[k][jj], gB);
-            }
+            auto gB0 = gIterB(k, j);
+            auto gB1 = gIterB(k, j + 1);
+            auto gB2 = gIterB(k, j + 2);
+            auto gB3 = gIterB(k, j + 3);
+            TLOAD(tB[k][0], gB0);
+            TLOAD(tB[k][1], gB1);
+            TLOAD(tB[k][2], gB2);
+            TLOAD(tB[k][3], gB3);
           }
 
           #pragma clang loop unroll(full)
@@ -2932,7 +2959,7 @@ void matmul_mask_multi4_B_tileop(float *dst, dtype *src0, dtype *src1){
               }
             }
             auto gC = gIterC(i,j+jj);
-            store_acc_tile_tileop(gC, tACC);
+            store_acc_tile(gC, tACC);
           }
         }
       }
@@ -2940,7 +2967,7 @@ void matmul_mask_multi4_B_tileop(float *dst, dtype *src0, dtype *src1){
 }
 
 template<typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mask_multi4_AB_tileop(float *dst, dtype *src0, dtype *src1){
+void matmul_mask_multi4_AB(float *dst, dtype *src0, dtype *src1){
     using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
     using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
     using gm_shapeC = global_tensor<float, RowMajor<gM, gN>>;
@@ -2970,19 +2997,25 @@ void matmul_mask_multi4_AB_tileop(float *dst, dtype *src0, dtype *src1){
 
         #pragma clang loop unroll(full)
         for(int k=0;k<Kb;k+=4){
-          #pragma clang loop unroll(full)
-          for(int kk=0;kk<4;kk++){
-            auto gA = gIterA(i,k+kk);
-            TLOAD(tA[k+kk], gA);
-          }
+          auto gA0 = gIterA(i, k);
+          auto gA1 = gIterA(i, k + 1);
+          auto gA2 = gIterA(i, k + 2);
+          auto gA3 = gIterA(i, k + 3);
+          TLOAD(tA[k], gA0);
+          TLOAD(tA[k + 1], gA1);
+          TLOAD(tA[k + 2], gA2);
+          TLOAD(tA[k + 3], gA3);
 
           #pragma clang loop unroll(full)
           for(int kk=0;kk<4;kk++){
-            #pragma clang loop unroll(full)
-            for(int jj=0;jj<4;jj++){
-              auto gB = gIterB(k+kk,j+jj);
-              TLOAD(tB[k+kk][jj], gB);
-            }
+          auto gB0 = gIterB(k + kk, j);
+          auto gB1 = gIterB(k + kk, j + 1);
+          auto gB2 = gIterB(k + kk, j + 2);
+          auto gB3 = gIterB(k + kk, j + 3);
+          TLOAD(tB[k + kk][0], gB0);
+          TLOAD(tB[k + kk][1], gB1);
+          TLOAD(tB[k + kk][2], gB2);
+          TLOAD(tB[k + kk][3], gB3);
           }
         }
 
@@ -2999,15 +3032,15 @@ void matmul_mask_multi4_AB_tileop(float *dst, dtype *src0, dtype *src1){
             TMATMUL_ACC(tACC, tACC, tA[k+2], tB[k+2][jj]);
             TMATMUL_ACC(tACC, tACC, tA[k+3], tB[k+3][jj]);
           }
-          auto gC = gIterC(i,j+jj);
-          store_acc_tile_tileop(gC, tACC);
+          auto gC = gIterC(i,j);
+          store_acc_tile(gC, tACC);
         }
       }
     }
 }
 
 template<typename dtype, const int tM, const int tN, const int tK>
-__attribute__((noinline)) void matmul_dynamic_new_tileop(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
+__attribute__((noinline)) void matmul_dynamic_new(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
     using gm_shapeA = global_tensor<dtype, RowMajor<-1, -1>>;
     using gm_shapeB = global_tensor<dtype, RowMajor<-1, -1>>;
     using gm_shapeC = global_tensor<float, RowMajor<-1, -1>>;
@@ -3043,14 +3076,14 @@ __attribute__((noinline)) void matmul_dynamic_new_tileop(float* dst, dtype* src0
                     TMATMUL_ACC(tACC, tACC, tA, tB);
                   }
               }
-              store_acc_tile_dynamic_tileop(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
+              store_acc_tile_dynamic(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
           }
       }
     }
 }
 
 template<typename dtype, const int tM, const int tN, const int tK>
-__attribute__((noinline)) void matmul_dynamic_tileop(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
+__attribute__((noinline)) void matmul_dynamic(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
     using gm_shapeA = global_tensor<dtype, RowMajor<-1, -1>>;
     using gm_shapeB = global_tensor<dtype, RowMajor<-1, -1>>;
     using gm_shapeC = global_tensor<float, RowMajor<-1, -1>>;
@@ -3091,7 +3124,7 @@ __attribute__((noinline)) void matmul_dynamic_tileop(float* dst, dtype* src0, dt
                     TMATMUL_ACC(tACC, tACC, tA, tB);
                   }
               }
-              store_acc_tile_dynamic_tileop(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
+              store_acc_tile_dynamic(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
           }
       }
     }
@@ -3115,7 +3148,7 @@ ResA find_reuseA_dynamic(int Mb, int Kb, int MAX_TILE_NUM) {
 }
 
 template<typename dtype, const int tM, const int tN, const int tK>
-__attribute__((noinline)) void matmul_dynamic_reuseA_tileop(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
+__attribute__((noinline)) void matmul_dynamic_reuseA(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
     const int MAX_TILE_NUM = 24;
 
     using gm_shapeA = global_tensor<dtype, RowMajor<-1, -1>>;
@@ -3213,7 +3246,7 @@ __attribute__((noinline)) void matmul_dynamic_reuseA_tileop(float* dst, dtype* s
 
             size_t offset_C = (i+ii) * gN * tile_shapeACC::Rows + j * tile_shapeACC::Cols;
             gm_shapeC gC(dst + offset_C, gM, gN);
-            store_acc_tile_dynamic_tileop(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
+            store_acc_tile_dynamic(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
           }
         }
 
@@ -3223,7 +3256,7 @@ __attribute__((noinline)) void matmul_dynamic_reuseA_tileop(float* dst, dtype* s
 }
 
 template<typename dtype, const int tM, const int tN, const int tK>
-__attribute__((noinline)) void matmul_dynamic_reuseB_tileop(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
+__attribute__((noinline)) void matmul_dynamic_reuseB(float* dst, dtype* src0, dtype* src1, int gM, int gN, int gK){
     const int MAX_TILE_NUM = 24;
 
     using gm_shapeA = global_tensor<dtype, RowMajor<-1, -1>>;
@@ -3323,7 +3356,7 @@ __attribute__((noinline)) void matmul_dynamic_reuseB_tileop(float* dst, dtype* s
 
             size_t offset_C =  j * gN * tile_shapeACC::Rows + (i+ii) * tile_shapeACC::Cols;
             gm_shapeC gC(dst + offset_C, gM, gN);
-            store_acc_tile_dynamic_tileop(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
+            store_acc_tile_dynamic(gC, tACC, tACC.GetValidRow(), tACC.GetValidCol());
           }
         }
 
@@ -3335,7 +3368,7 @@ __attribute__((noinline)) void matmul_dynamic_reuseB_tileop(float* dst, dtype* s
 
 
 template <typename dtype, const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_mx_tileop(float *dst, dtype *src0, dtype *src1, uint8_t *src0_mx, uint8_t *src1_mx) {
+void matmul_mx(float *dst, dtype *src0, dtype *src1, uint8_t *src0_mx, uint8_t *src1_mx) {
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
   using gm_shapeAMX = global_tensor<uint8_t, RowMajor<gM, gK/32>>;
@@ -3344,8 +3377,8 @@ void matmul_mx_tileop(float *dst, dtype *src0, dtype *src1, uint8_t *src0_mx, ui
 
   using tile_shapeA = TileLeft<dtype, tM, tK>;
   using tile_shapeB = TileRight<dtype, tK, tN>;
-  using tile_shapeAMX = Tile<Location::Scaling, uint8_t, tM, tK, BLayout::RowMajor, tM, tK/32, SLayout::RowMajor>;
-  using tile_shapeBMX = Tile<Location::Scaling, uint8_t, tK, tN, BLayout::ColMajor, tK/32, tN, SLayout::ColMajor>;
+  using tile_shapeAMX = Tile<Location::Scaling, uint8_t, tM, tK/32, BLayout::RowMajor, tM, tK/32, SLayout::NoneBox>;
+  using tile_shapeBMX = Tile<Location::Scaling, uint8_t, tK/32, tN, BLayout::ColMajor, tK/32, tN, SLayout::NoneBox>;
   using tile_shapeACC = TileAcc<float, tM, tN>;
   using itA = global_iterator<gm_shapeA, tile_shapeA>;
   using itB = global_iterator<gm_shapeB, tile_shapeB>;
@@ -3368,47 +3401,49 @@ void matmul_mx_tileop(float *dst, dtype *src0, dtype *src1, uint8_t *src0_mx, ui
         auto gC = gCIter(i, j);
 
         tile_shapeACC tACC;
-        if constexpr (Kb > 0) {
-          auto gA = gAIter(i,0);
-          auto gB = gBIter(0,j);
-          auto gAMX = gAMXIter(i,0);
-          auto gBMX = gBMXIter(0,j);
+        #pragma clang loop unroll(full)
+        for(int k=0;k<Kb;k++){
+          auto gA = gAIter(i,k);
+          auto gB = gBIter(k,j);
+          auto gAMX = gAIter(i,k);
+          auto gBMX = gBIter(k,j);
           tile_shapeA tA;
           tile_shapeB tB;
           tile_shapeAMX tAMX;
           tile_shapeBMX tBMX;
           TLOAD(tA, gA);
           TLOAD(tB, gB);
-          TLOAD(tAMX, gAMX);
-          TLOAD(tBMX, gBMX);
-          TMATMUL_MX(tACC, tA, tAMX, tB, tBMX);
-        }
-        if constexpr (Kb > 1) {
-          #pragma clang loop unroll(full)
-          for(int k=1;k<Kb;k++){
-            auto gA = gAIter(i,k);
-            auto gB = gBIter(k,j);
-            auto gAMX = gAMXIter(i,k);
-            auto gBMX = gBMXIter(k,j);
-            tile_shapeA tA;
-            tile_shapeB tB;
-            tile_shapeAMX tAMX;
-            tile_shapeBMX tBMX;
-            TLOAD(tA, gA);
-            TLOAD(tB, gB);
-            TLOAD(tAMX, gAMX);
-            TLOAD(tBMX, gBMX);
+
+          blk_tload(tAMX.GetValidCol(), tAMX.GetValidRow(), tile_shapeAMX::Cols,
+          type_traits<typename tile_shapeAMX::DType>::TypeCode,
+          PadValue::Null,
+          LayoutCvtEnum::ND2ZZ,
+          tAMX.data(),
+          gAMX.data(),
+          (gAMX.GetStride(3) * type_traits<typename gm_shapeAMX::DType>::bits + 7) / 8);
+
+          blk_tload(tBMX.GetValidCol(), tBMX.GetValidRow(), tile_shapeBMX::Cols,
+          type_traits<typename tile_shapeBMX::DType>::TypeCode,
+          PadValue::Null,
+          LayoutCvtEnum::ND2NN,
+          tBMX.data(),
+          gBMX.data(),
+          (gBMX.GetStride(3) * type_traits<typename gm_shapeBMX::DType>::bits + 7) / 8);
+
+          if(k==0){
+            TMATMUL_MX(tACC, tA, tAMX, tB, tBMX);
+          }else{
             TMATMUL_MX(tACC, tA, tAMX, tB, tBMX);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
     }
   }
 }
 
 template <typename dtype, const int gM, const int gN, const int gK, const int tM,
           const int tN, const int tK>
-void matmul_mask_2lvl_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
+void matmul_mask_2lvl(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
 
   using gm_shapeA = global_tensor<dtype, RowMajor<gM, gK>>;
   using gm_shapeB = global_tensor<dtype, RowMajor<gK, gN>>;
@@ -3487,7 +3522,7 @@ void matmul_mask_2lvl_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
       if constexpr (rmd_N) {
         auto gC = gCIter(i, Nb);
@@ -3528,7 +3563,7 @@ void matmul_mask_2lvl_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
     if constexpr (rmd_M) {
@@ -3571,7 +3606,7 @@ void matmul_mask_2lvl_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
       if constexpr (rmd_N) {
         auto gC = gCIter(Mb, Nb);
@@ -3612,20 +3647,20 @@ void matmul_mask_2lvl_tileop(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             TMATMUL(tACC, tA, tB);
           }
         }
-        store_acc_tile_tileop(gC, tACC);
+        store_acc_tile(gC, tACC);
       }
     }
   }
 }
 
 template<const int gM, const int gN, const int gK, const int tM, const int tN, const int tK>
-void matmul_vec_tileop(float* dst, float* src0, float* src1){
+void matmul_vec(float* dst, float* src0, float* src1){
     using gm_shapeA = global_tensor<float, RowMajor<gM, gK>>;
     using gm_shapeB = global_tensor<float, RowMajor<gK, gN>>;
     using gm_shapeC = global_tensor<float, RowMajor<gM, gN>>;
     using tile_shapeA = Tile<Location::Vec, float, tM, tK, BLayout::RowMajor>;
     using tile_shapeB = Tile<Location::Vec, float, tK, tN, BLayout::RowMajor>;
-    using tile_shapeACC = TileAcc<float, tM, tN>;
+    using tile_shapeACC = Tile<Location::Vec, float, tM, tN, BLayout::RowMajor>;
     using gm_iteratorA = global_iterator<gm_shapeA, tile_shapeA>;
     using gm_iteratorB = global_iterator<gm_shapeB, tile_shapeB>;
     using gm_iteratorC = global_iterator<gm_shapeC, tile_shapeACC>;
@@ -3642,7 +3677,7 @@ void matmul_vec_tileop(float* dst, float* src0, float* src1){
         for(int j=0;j<Nb;j++){
             auto gC = gCIter(i, j);
 
-            tile_shapeACC tACC;
+            tile_shapeACC tACC(0);
             for(int k=0;k<Kb;k++){
                 auto gA = gAIter(i,k);
                 auto gB = gBIter(k,j);
@@ -3650,26 +3685,22 @@ void matmul_vec_tileop(float* dst, float* src0, float* src1){
                 tile_shapeB tB;
                 TLOAD(tA, gA);
                 TLOAD(tB, gB);
-                if (k == 0) {
-                    TMATMUL(tACC, tA, tB);
-                } else {
-                    TMATMUL_ACC(tACC, tACC, tA, tB);
-                }
+                TMATMUL_ACC(tACC, tACC, tA, tB);
             }
-            store_acc_tile_tileop(gC, tACC);
+            TSTORE(gC, tACC);
         }
     }
 }
 
 template <uint16_t M, uint16_t N, uint16_t K>
-void matmul_tile_vec_tileop(float* dst, float* src0, float* src1) {
+void matmul_tile_vec(float* dst, float* src0, float* src1) {
     using gm_shape_A = global_tensor<float, RowMajor<M, K>>;
     using gm_shape_B = global_tensor<float, RowMajor<K, N>>;
     using gm_shape_C = global_tensor<float, RowMajor<M, N>>;
 
-    using tile_shape_A = TileLeft<float, M, K>;
-    using tile_shape_B = TileRight<float, K, N>;
-    using tile_shape_C = TileAcc<float, M, N>;
+    using tile_shape_A = Tile<Location::Vec, float, M, K, BLayout::RowMajor>;
+    using tile_shape_B = Tile<Location::Vec, float, K, N, BLayout::RowMajor>;
+    using tile_shape_C = Tile<Location::Vec, float, M, N, BLayout::RowMajor>;
 
     gm_shape_A s0(src0);
     gm_shape_B s1(src1);
@@ -3682,11 +3713,11 @@ void matmul_tile_vec_tileop(float* dst, float* src0, float* src1) {
     TLOAD(d0, s0);
     TLOAD(d1, s1);
     TMATMUL(d2, d0, d1);
-    store_acc_tile_tileop(res, d2);
+    TSTORE(res, d2);
 }
 
 template <uint16_t M, uint16_t N, uint16_t K>
-void matmul_tile_frac_tileop(float* dst, float* src0, float* src1) {
+void matmul_tile_frac(float* dst, float* src0, float* src1) {
     using gm_shape_A = global_tensor<float, RowMajor<M, K>>;
     using gm_shape_B = global_tensor<float, ColMajor<K, N>>;
     using gm_shape_C = global_tensor<float, RowMajor<M, N>>;
@@ -3706,7 +3737,7 @@ void matmul_tile_frac_tileop(float* dst, float* src0, float* src1) {
     TLOAD(d0, s0);
     TLOAD(d1, s1);
     TMATMUL(d2, d0, d1);
-    store_acc_tile_tileop(res, d2);
+    store_acc_tile(res, d2);
 }
 
 

@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "reduction/reducesum_colvec_pto.hpp"
+#include "reduction/reducesum_colvec.hpp"
 
 
 #ifndef RDType

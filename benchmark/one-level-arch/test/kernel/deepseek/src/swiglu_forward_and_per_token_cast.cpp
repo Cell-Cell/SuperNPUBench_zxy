@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/quant/swiglu_fused_cast_pto.hpp"
+#include "deepseek/quant/swiglu_fused_cast.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

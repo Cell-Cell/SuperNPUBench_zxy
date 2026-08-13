@@ -75,7 +75,7 @@ Flash Attention 算子集合，包含多种变体:
 
 ## 实现方式
 
-### SFA (块稀疏, `sfa_pto.hpp`)
+### SFA (块稀疏, `sfa.hpp`)
 两遍设计:
 - **Pass 1** (reduce): 对每个 Q 块，遍历 CSR 活跃 K/V 块: Q·K^T → scale →
   online softmax 更新 (colmax → rescale old → exp → colsum → add)
@@ -84,12 +84,12 @@ Flash Attention 算子集合，包含多种变体:
 
 避免 `TMATMUL_ACC` 的 tile 寄存器溢出问题，使用 fresh `TMATMUL`。
 
-### 2D Unroll (`fa_2d_unroll_pto.hpp`)
+### 2D Unroll (`fa_2d_unroll.hpp`)
 单遍 online softmax，Xdim 个 Q 块 × Ydim 个 K/V 块并行展开。
 每个 K/V 组: QK → per-Q softmax (Ydim 路归约树) → P·V → 在线更新 O。
 Ydim∈{1,2,4} 有硬编码的归约树。不处理 tail (要求 Qb%Xdim==0, Kb%Ydim==0)。
 
-### HiF4 (`fa_hif4_pto.hpp`)
+### HiF4 (`fa_hif4.hpp`)
 使用 `TMATMUL_MX` 带缩放因子。softmax 概率通过 `TQUANT<MXFP4>` 量化为 FP4。
 P·V 也使用 `TMATMUL_MX`。qD 必须等于 vD。
 
@@ -97,11 +97,11 @@ P·V 也使用 `TMATMUL_MX`。qD 必须等于 vD。
 
 | 文件 | 说明 |
 |------|------|
-| `sfa_pto.hpp` | 块稀疏 Flash Attention (两遍) |
-| `fa_2d_unroll_pto.hpp` | 稠密 2D 展开 Flash Attention |
-| `fa_hif4_pto.hpp` | HiF4 量化 Flash Attention |
-| `fa_softmax_pto.hpp` | PTO softmax 组件 |
-| `fa_dcore_pto.hpp` | fa_2d_unroll 薄封装 |
-| `fa_unalign_2d_unroll_pto.hpp` | fa_2d_unroll 薄封装 |
+| `sfa.hpp` | 块稀疏 Flash Attention (两遍) |
+| `fa_2d_unroll.hpp` | 稠密 2D 展开 Flash Attention |
+| `fa_hif4.hpp` | HiF4 量化 Flash Attention |
+| `fa_softmax.hpp` | PTO softmax 组件 |
+| `fa_dcore.hpp` | fa_2d_unroll 薄封装 |
+| `fa_unalign_2d_unroll.hpp` | fa_2d_unroll 薄封装 |
 | `fa_utils.h` | 辅助工具 |
 | `fa_fp4_utils.h` | FP4 辅助工具 |

@@ -2,7 +2,7 @@
 #define SFA_PTO_HPP
 
 // =============================================================================
-// sfa_pto.hpp — Sparse Flash Attention (block-sparse, PTO tile-op variant)
+// sfa.hpp — Sparse Flash Attention (block-sparse, PTO tile-op variant)
 // =============================================================================
 //
 // 【计算语义】

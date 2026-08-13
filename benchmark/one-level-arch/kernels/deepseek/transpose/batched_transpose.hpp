@@ -1,5 +1,5 @@
 // =============================================================================
-// batched_transpose_pto.hpp — 批量 3D 转置 (B,M,N)→(B,N,M)（tile 版）
+// batched_transpose.hpp — 批量 3D 转置 (B,M,N)→(B,N,M)（tile 版）
 // =============================================================================
 //
 // 【功能】
@@ -13,7 +13,7 @@
 //   T.copy → TLOAD / TSTORE
 //   global_iterator 仅 2 参 → 3D(B,M,N) 展平为 2D(B*M, N)，输出 2D(B*N, M)
 //
-// 【约束】TileRows/Cols 使 dtype 32B 对齐。2D 已由 kernels/transpose/transpose_pto.hpp 实现。
+// 【约束】TileRows/Cols 使 dtype 32B 对齐。2D 已由 kernels/transpose/transpose.hpp 实现。
 //
 // 【算法步骤（每 batch b, 行tile rt, 列tile ct）】
 //   TLOAD src(2D b*Rows/TileRows+rt, ct)→TTRANS(dst, src)→TSTORE(2D b*Cols/TileCols+ct, rt)

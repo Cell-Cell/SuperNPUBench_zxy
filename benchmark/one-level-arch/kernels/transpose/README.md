@@ -72,6 +72,6 @@
 
 | 文件 | 说明 |
 |------|------|
-| `transpose_pto.hpp` | 通用 ND + 2D 转置 |
-| `transpose_vector_007_pto.hpp` | 4096×3 → 3×4096 |
-| `transpose_vector_050_pto.hpp` | 8×64×64 → 64×8×64 (逐行复制) |
+| `transpose.hpp` | 通用 ND + 2D 转置 |
+| `transpose_vector_007.hpp` | 4096×3 → 3×4096 |
+| `transpose_vector_050.hpp` | 8×64×64 → 64×8×64 (逐行复制) |

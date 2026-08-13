@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/mhc/multilayer_recompute_pto.hpp"
+#include "deepseek/mhc/multilayer_recompute.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/inplace_unique_group_indices_pto.hpp"
+#include "deepseek/moe/inplace_unique_group_indices.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

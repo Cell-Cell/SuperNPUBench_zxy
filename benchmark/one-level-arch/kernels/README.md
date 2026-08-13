@@ -15,14 +15,14 @@ for type/dimension parameterization.
 - `matmul_mx.hpp` — MX quantized matmul; FP4×FP4, BF16×FP4 mixed precision; microscaling factors.
 
 ### 2. Flash Attention — `fa/` (see [`fa/README.md`](fa/README.md))
-- `fa_2d_unroll.hpp` / `fa_2d_unroll_pto.hpp` — 2D unroll (X/Y dims); seq len 256/512.
-- `fa_unalign_2d_unroll.hpp` / `fa_unalign_2d_unroll_pto.hpp` — unaligned boundary.
-- `fa_hif4.hpp` / `fa_hif4_pto.hpp` — HIF4 quantized.
-- `fa_dcore.hpp` / `fa_dcore_pto.hpp` — DCore-optimized.
-- `sfa_pto.hpp` — Sparse Flash Attention (block-sparse / CSR pattern), two-pass.
+- `fa_2d_unroll.hpp` / `fa_2d_unroll.hpp` — 2D unroll (X/Y dims); seq len 256/512.
+- `fa_unalign_2d_unroll.hpp` / `fa_unalign_2d_unroll.hpp` — unaligned boundary.
+- `fa_hif4.hpp` / `fa_hif4.hpp` — HIF4 quantized.
+- `fa_dcore.hpp` / `fa_dcore.hpp` — DCore-optimized.
+- `sfa.hpp` — Sparse Flash Attention (block-sparse / CSR pattern), two-pass.
 - `fa_utils.h` / `fa_fp4_utils.h` — shared helpers.
 
-> Note: in `one-level-arch`, `*_pto.hpp` files are PTO-style variants kept
+> Note: in `one-level-arch`, `*.hpp` files are PTO-style variants kept
 > alongside the base implementations.
 
 ### 3. Broadcast — `broadcast/`
@@ -53,7 +53,7 @@ for type/dimension parameterization.
   with `-s core.singleTierMode=true`.
 
 ### 10. Sort — `sort/` (see [`sort/README.md`](sort/README.md))
-- `topk.hpp` / `topk_pto.hpp` — Top-K via radix-bucket histogram.
+- `topk.hpp` / `topk.hpp` — Top-K via radix-bucket histogram.
 
 ### 11. DeepSeek 迁移算子 — `deepseek/` (see [`deepseek/README.md`](deepseek/README.md))
 - 19 个从 TileKernels (TileLang DSL) 迁移的 tile 版算子:

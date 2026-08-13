@@ -65,8 +65,8 @@ Tail 变体使用 `ValidRow`/`ValidCol` 处理非整除维度。
 | 文件 | 说明 |
 |------|------|
 | `matmul.hpp` | _tileop 后缀变体 |
-| `matmul_pto.hpp` | PTO 命名变体 |
+| `matmul.hpp` | PTO 命名变体 |
 | `matmul_mx.hpp` | MX 混合精度 (_tileop) |
-| `matmul_mx_pto.hpp` | MX 混合精度 (PTO) |
+| `matmul_mx.hpp` | MX 混合精度 (PTO) |
 | `matmul_shared.hpp` | matmul的A，B矩阵均从gm加载到sharedtreg版本 |
 | `matmul_multithread.hpp` | matmul的A，B矩阵均从gm->localtreg->sharedtreg版本 |

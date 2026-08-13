@@ -7,9 +7,9 @@
 
 | 文件 | 对应 TileKernels | 功能 | 主指令（实际编译版） |
 |------|------------------|------|---------------------|
-| `cast_back_pto.hpp` | `quant/cast_back_kernel.py` | FP8/FP4 反量化为 fp32（per-token/per-channel） | `TCVT`+`TROWEXPANDMUL`/`TCOLEXPANDMUL`（TDEQUANT 未提供→显式 TCVT+广播乘） |
-| `per_token_cast_pto.hpp` | `quant/per_token_cast_kernel.py`、`per_channel_cast_kernel.py` | 行级/列级 FP8 量化（amax→sf→缩放） | `TMAX`(`TROWMAX`(x),`TROWMAX`(`TMULS`(x,-1)))(absmax 模拟) + `TMAXS`+`TMULS`+`TRECIP`+`TROW/TCOLEXPANDMUL`+`TCVT`（TABS 未提供→max(x,-x)） |
-| `swiglu_fused_cast_pto.hpp` | `quant/swiglu_forward_and_per_token_cast_kernel.py` | 融合 SwiGLU 前向 + per-token 量化 | `TMULS`(x,-1)(TNEG 未提供)+`TEXP`+`TADDS`+`TRECIP`+`TMUL`(silu) → 量化链 |
+| `cast_back.hpp` | `quant/cast_back_kernel.py` | FP8/FP4 反量化为 fp32（per-token/per-channel） | `TCVT`+`TROWEXPANDMUL`/`TCOLEXPANDMUL`（TDEQUANT 未提供→显式 TCVT+广播乘） |
+| `per_token_cast.hpp` | `quant/per_token_cast_kernel.py`、`per_channel_cast_kernel.py` | 行级/列级 FP8 量化（amax→sf→缩放） | `TMAX`(`TROWMAX`(x),`TROWMAX`(`TMULS`(x,-1)))(absmax 模拟) + `TMAXS`+`TMULS`+`TRECIP`+`TROW/TCOLEXPANDMUL`+`TCVT`（TABS 未提供→max(x,-x)） |
+| `swiglu_fused_cast.hpp` | `quant/swiglu_forward_and_per_token_cast_kernel.py` | 融合 SwiGLU 前向 + per-token 量化 | `TMULS`(x,-1)(TNEG 未提供)+`TEXP`+`TADDS`+`TRECIP`+`TMUL`(silu) → 量化链 |
 
 ## 注
 

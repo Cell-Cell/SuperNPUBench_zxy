@@ -4,7 +4,7 @@
 #include <cstdio>
 
 #include "fileop.h"
-#include "gather/gather_pto.hpp"
+#include "gather/gather.hpp"
 
 
 #ifndef DType

@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/mhc/norm_fn_pto.hpp"
+#include "deepseek/mhc/norm_fn.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

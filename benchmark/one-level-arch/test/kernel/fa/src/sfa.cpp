@@ -1,7 +1,7 @@
 #include <common/pto_tileop.hpp>
 #include "benchmark.h"
 #include "fileop.h"
-#include "fa/sfa_pto.hpp"
+#include "fa/sfa.hpp"
 
 #define B 1
 #define H 1

@@ -68,7 +68,7 @@ Tail 变体使用 `ValidCol` 处理非整除列。
 
 | 文件 | 说明 |
 |------|------|
-| `broadcast_pto.hpp` | Generic N-D 广播 (offset+gather) |
-| `broadcast_vec_019_pto.hpp` | (B,1,K)→(B,N,K) via TINSERT |
-| `broadcast_vec_039_pto.hpp` | (B,1,K)→(B,N,K), K=2^n |
-| `broadcast_vec_07_pto.hpp` | (N,1)→(N,C) via TROWEXPAND |
+| `broadcast.hpp` | Generic N-D 广播 (offset+gather) |
+| `broadcast_vec_019.hpp` | (B,1,K)→(B,N,K) via TINSERT |
+| `broadcast_vec_039.hpp` | (B,1,K)→(B,N,K), K=2^n |
+| `broadcast_vec_07.hpp` | (N,1)→(N,C) via TROWEXPAND |

@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/quant/per_token_cast_pto.hpp"
+#include "deepseek/quant/per_token_cast.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 
