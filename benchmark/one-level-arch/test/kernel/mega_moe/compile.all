@@ -1,0 +1,8 @@
+#!/bin/bash
+# MegaMoe A8W8 (完整真机流水) 迁移样例编译入口
+# 默认完整规格 256×128×256; gfrun 仿真验证用小规格 64×32×64 (分钟级), 见 mega_moe_sim.cpp 头部说明
+
+: "${COMPILER_DIR:?Set COMPILER_DIR to the in-repo Linx compiler bin directory}"
+
+make TESTCASE=mega_moe_sim BS=256 H=128 HIDDEN=256 diss
+make TESTCASE=mega_moe_sim BS=64 H=32 HIDDEN=64 diss
