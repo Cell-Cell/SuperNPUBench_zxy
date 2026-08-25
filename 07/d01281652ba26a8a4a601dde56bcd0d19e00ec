@@ -1,0 +1,29 @@
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/ISSUE.md
+  s_2fc5dac4ded1f9::t_ff6a4b3f092510 1-115
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/README.md
+  s_2fc5dac4ded1f9::t_804a79d532d38f 1-68
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/instrumentation/bfu_zero_target_trace.patch
+  s_2fc5dac4ded1f9::t_cc621a47dcef5a 1-66
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/kernels/moe_dispatch_v2.hpp
+  s_2fc5dac4ded1f9::t_03fda54f681800 1-1297
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/moe_dispatch_v2.elf.diss
+  s_2fc5dac4ded1f9::t_28e2581a331790 1-1417
+repro/issue_B_moe_dispatch_gfsim_ret_zero_tgt/repro.sh
+  s_2fc5dac4ded1f9::t_8fba0208d3061f 1-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "07d01281652ba26a8a4a601dde56bcd0d19e00ec",
+  "prompts": {},
+  "sessions": {
+    "s_2fc5dac4ded1f9": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a8d04e4e103138c69c76a04",
+        "model": "glm-5.3__dev"
+      },
+      "human_author": "Cell-Cell <2601732551@qq.com>"
+    }
+  }
+}
