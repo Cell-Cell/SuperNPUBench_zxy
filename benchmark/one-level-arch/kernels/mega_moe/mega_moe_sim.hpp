@@ -370,10 +370,13 @@ struct MegaMoeWave {
     }
 
     // 源 InitExpertTokenCountExportBuffers (9709): 统计导出缓冲初始化
+    // 注: volatile 阻止相邻 i64 清零被合并为 16B tile store (BLK_TSTORE v2i64),
+    //     linxv5 后端不支持整数 tile 类型, 会报 "Cannot select: v2i64 = BUILD_VECTOR"
     void InitExpertTokenCountExportBuffers()
     {
+        volatile int64_t* p = g_mmExpertTokenNums;
         for (uint32_t e = 0; e < tilingData_.moeExpertPerRank; ++e) {
-            g_mmExpertTokenNums[e] = 0;
+            p[e] = 0;
         }
     }
 
@@ -809,8 +812,10 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
     // 统计导出: 每线程全量扫描 topkIds (确定性、无跨线程竞态; 数值 = 各核局部统计之和,
     // 与源"主核汇总 workspace"语义等价; 核内局部统计槽 statsOffset 仍按源保留写入)
     {
+        // 注: volatile 阻止相邻 i64 清零被合并为 16B tile store (BLK_TSTORE v2i64)
+        volatile int64_t* tokZero = g_mmExpertTokenNums;
         for (uint32_t e = 0; e < tilingData.moeExpertPerRank; ++e) {
-            g_mmExpertTokenNums[e] = 0;
+            tokZero[e] = 0;
         }
         for (uint32_t t = 0; t < tilingData.bs; ++t) {
             const int32_t expert = g_mmTopkIds[t * tilingData.topK];

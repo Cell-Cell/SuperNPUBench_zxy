@@ -134,8 +134,11 @@ static double ref_w2(uint32_t e, uint32_t k, uint32_t n)
 static void compute_golden(double* yRef, int64* tokRef)
 {
     for (uint32 t = 0; t < kBS * kH; ++t) yRef[t] = 0.0;
-    tokRef[0] = 0;
-    tokRef[1] = 0;
+    // 注: volatile 阻止相邻 i64 清零被合并为 16B tile store (BLK_TSTORE v2i64),
+    //     linxv5 后端不支持整数 tile 类型, 会报 "Cannot select: v2i64 = BUILD_VECTOR"
+    volatile int64* tokV = tokRef;
+    tokV[0] = 0;
+    tokV[1] = 0;
 
     for (uint32 t = 0; t < kBS; ++t) {
         const uint32 expert = (uint32)g_mmTopkIds[t];
@@ -183,8 +186,10 @@ int main()
     float* x = g_mmX;
     float* y = g_mmY;
     int64* tokenNumsOut = g_mmExpertTokenNums;
-    tokenNumsOut[0] = -1;
-    tokenNumsOut[1] = -1;
+    // 注: volatile 阻止相邻 i64 写入被合并为 16B tile store (BLK_TSTORE v2i64)
+    volatile int64* tokInit = tokenNumsOut;
+    tokInit[0] = -1;
+    tokInit[1] = -1;
 
     // 基础内存写读自检 (gfrun 通道可用性)
     g_mmExpertTokenNums[0] = 12345;
