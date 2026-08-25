@@ -565,7 +565,11 @@ void moe_dispatch_v2(
         uint32_t newAivId;
         if (isFront) { newAivId = aivId_; }
         else if (aivId_ >= aivUsedAllToAll_) { newAivId = aivId_ - aivUsedAllToAll_; }
-        else { newAivId = aivId_ - moeUsedAivNum_; }
+        // Fix (issue #348): aivId_ < moeUsedAivNum_ (MoE AIV, e.g. single-thread aivId_=0)
+        // previously underflowed: 0 - moeUsedAivNum_ = 0xFFFFFFFF -> startTokenId=0xFFFFFFFC,
+        // endTokenId=0 -> zero-iteration cumsum loop -> sendCountsOut never written,
+        // validNum_==0 early return. Clamp to 0 (first worker of the partition).
+        else { newAivId = (aivId_ >= moeUsedAivNum_) ? (aivId_ - moeUsedAivNum_) : 0; }
         startTokenId = sendTokenNum * newAivId;
         if (newAivId < remainderTokenNum) { sendTokenNum += 1; startTokenId += newAivId; }
         else { startTokenId += remainderTokenNum; }
@@ -630,14 +634,40 @@ void moe_dispatch_v2(
                 TSTORE(gmDst, dataTile);
             }
         }
+        // Fix (issue #348): block packing — original Ascend C writes the token
+        // record (x + triple + scale, contiguous [0, hOutSizeAlign_)) into the
+        // window with Copy stride {1,1,16,15}: block b's 480B data area
+        // [b*512, b*512+480) holds record slice [b*480, (b+1)*480); the 32B flag
+        // area is preserved (pre-filled 1.0f). The PTO port wrote the record
+        // contiguously, so x ([0,512)) overlapped block 0's flag area [480,512)
+        // and the flag write clobbered the last 8 floats of x. Repack in place,
+        // iterating blocks from the last to the first so already-moved data is
+        // never overwritten (overlapping ranges handled like memmove).
+        for (int b = (int)blockCntPerToken_ - 1; b >= 1; b--) {
+            uint32_t srcOff = (uint32_t)b * SPLIT_BLOCK_DATA_SIZE;
+            uint32_t cnt = (hOutSizeAlign_ > srcOff) ? (hOutSizeAlign_ - srcOff) : 0U;
+            if (cnt > SPLIT_BLOCK_DATA_SIZE) cnt = SPLIT_BLOCK_DATA_SIZE;
+            uint32_t* dst = reinterpret_cast<uint32_t*>(wAddr + (uint64_t)b * SPLIT_BLOCK_SIZE);
+            uint32_t* src = reinterpret_cast<uint32_t*>(wAddr + srcOff);
+            for (uint32_t i = cnt / sizeof(uint32_t); i > 0; i--) {
+                dst[i - 1] = src[i - 1];
+            }
+        }
         // Store flag (1.0) at each 512B block's flag area (offset 480 within each block)
         // Original: Duplicate(1.0f) pre-fills entire outTensor_, Copy preserves flag gaps
-        // PTO: TEXPANDS(1.0f) + TSTORE for each 512B block's flag area
-        tile_fl flagTile;
-        TEXPANDS(flagTile, 1.0f);
+        // Fix (issue #348): flag area is 32B (8 floats), smaller than the minimum
+        // TSTORE tile (128B). TSTORE with tile_fl wrote [blk*512+480, blk*512+608),
+        // clobbering the NEXT block's data area — triple [512,524) / scale [524,528)
+        // of this slot (block 0 flag write) and the first 96B of the following
+        // slot (last block flag write). Use scalar writes limited to the 32B
+        // flag area (same approach as FillTriple).
+        constexpr uint32_t FLAG_AREA_FLOATS = (SPLIT_BLOCK_SIZE - SPLIT_BLOCK_DATA_SIZE) / sizeof(float);
         for (uint32_t blk = 0; blk < blockCntPerToken_; blk++) {
-            gm_fl gmFlag(reinterpret_cast<float*>(wAddr + blk * SPLIT_BLOCK_SIZE + SPLIT_BLOCK_DATA_SIZE));
-            TSTORE(gmFlag, flagTile);
+            float* flagPtr = reinterpret_cast<float*>(
+                wAddr + blk * SPLIT_BLOCK_SIZE + SPLIT_BLOCK_DATA_SIZE);
+            for (uint32_t f = 0; f < FLAG_AREA_FLOATS; f++) {
+                flagPtr[f] = 1.0f;
+            }
         }
         // flagPadOffset_ = hCommuSize_ - flagPadOffset_ (ping-pong toggle, no-op in PTO)
     };
@@ -1083,6 +1113,25 @@ void moe_dispatch_v2(
             uint32_t curDstPosition = dstPosition + slot;
             uint8_t* slotAddr = wAddr + (uint64_t)(expertFinishNum_[index] + slot) * hCommuSize_;
 
+            // Fix (issue #348): block unpacking — inverse of the packing done in
+            // TokenToExpert. Original Ascend C reads the window with
+            // srcTokenCopyParams {blockCntPerToken_, 480, UB_ALIGN, 0}: each
+            // block's 480B data area is gathered contiguously into UB, restoring
+            // the linear token record (x [0,512) + triple [512,524) + scale
+            // [524,528)) before the token/triple/scale reads below. Iterate
+            // blocks from the first to the last (forward, inverse of packing).
+            for (uint32_t b = 1; b < blockCntPerToken_; b++) {
+                uint32_t srcOff = (uint32_t)b * SPLIT_BLOCK_DATA_SIZE;
+                uint32_t cnt = (hOutSizeAlign_ > srcOff) ? (hOutSizeAlign_ - srcOff) : 0U;
+                if (cnt > SPLIT_BLOCK_DATA_SIZE) cnt = SPLIT_BLOCK_DATA_SIZE;
+                uint32_t* dst = reinterpret_cast<uint32_t*>(slotAddr + srcOff);
+                uint32_t* src = reinterpret_cast<uint32_t*>(slotAddr + (uint64_t)b * SPLIT_BLOCK_SIZE);
+                // src > dst with possible overlap [dst+512, dst+cnt): forward copy
+                for (uint32_t i = 0; i < cnt / sizeof(uint32_t); i++) {
+                    dst[i] = src[i];
+                }
+            }
+
             // 1) Read token data from window → expandXOut (TLOAD → TSTORE per tile)
             for (int t = 0; t < HTiles; t++) {
                 gm_w gmData(reinterpret_cast<XOutType*>(slotAddr) + t * TileW);
@@ -1157,10 +1206,10 @@ void moe_dispatch_v2(
 
     // --- ClearLocalWindowDataFlags (A:2205-2244) ---
     // Original: Duplicate(0.0) → batched DataCopy clean flags per expert slot
-    // PTO: TEXPANDS(0.0f) + TSTORE per slot
+    // Fix (issue #348): scalar writes limited to the 32B flag area — TSTORE tile
+    // is 128B min and would clobber the next block's data area (see TokenToExpert).
     {
-        tile_fl clearFlagTile;
-        TEXPANDS(clearFlagTile, 0.0f);
+        constexpr uint32_t CLEAR_FLAG_FLOATS = (SPLIT_BLOCK_SIZE - SPLIT_BLOCK_DATA_SIZE) / sizeof(float);
         for (uint32_t idx = 0; idx < validNum_; idx++) {
             uint32_t srcExpertId = expertMap_[idx];
             uint32_t srcDataBlockIdx = GetLocalWindowSrcDataBlockIdx(srcExpertId, moeExpertNumPerRank_);
@@ -1170,8 +1219,11 @@ void moe_dispatch_v2(
                                  (uint64_t)slotIdx * hCommuSize_;
                 // Clear flag at each 512B block's flag area
                 for (uint32_t blk = 0; blk < blockCntPerToken_; blk++) {
-                    gm_fl gmFlag(reinterpret_cast<float*>(wAddr + blk * SPLIT_BLOCK_SIZE + SPLIT_BLOCK_DATA_SIZE));
-                    TSTORE(gmFlag, clearFlagTile);
+                    float* flagPtr = reinterpret_cast<float*>(
+                        wAddr + blk * SPLIT_BLOCK_SIZE + SPLIT_BLOCK_DATA_SIZE);
+                    for (uint32_t f = 0; f < CLEAR_FLAG_FLOATS; f++) {
+                        flagPtr[f] = 0.0f;
+                    }
                 }
             }
         }
