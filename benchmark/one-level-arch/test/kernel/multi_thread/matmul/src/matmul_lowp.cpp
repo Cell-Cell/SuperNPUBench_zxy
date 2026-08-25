@@ -4,6 +4,7 @@
 
 #include "benchmark.h"
 #include "fileop.h"
+#include "linx_group_runtime.h"
 
 #ifndef LOWP_DTYPE
 #define LOWP_DTYPE __fp8_e4m3
@@ -48,8 +49,37 @@
 #define ALIGN_MASK 0xfffffffffffff000ull
 #define ALIGN (4 * 1024)
 
+using dtype = LOWP_DTYPE;
+
+struct LowpMatmulContext {
+    dtype *src0;
+    dtype *src1;
+    uint8_t *src0Scale;
+    uint8_t *src1Scale;
+    float *dst;
+};
+
+extern "C" int __linx_group_worker_main(uint32_t peId, void *opaque) {
+    (void)peId;
+    LowpMatmulContext *context =
+        static_cast<LowpMatmulContext *>(opaque);
+    constexpr int kStoredGK = globK / PACKED_FACTOR;
+
+    BENCHSTART;
+    for (int b = 0; b < Batch; ++b) {
+        matmul_shared_lowp<dtype, PACKED_FACTOR, USE_MX != 0,
+                           globM, globN, globK, tilM, tilN, tilK>(
+            context->dst + b * globM * globN,
+            context->src0 + b * globM * kStoredGK,
+            context->src1 + b * kStoredGK * globN,
+            context->src0Scale + b * globM * (globK / 32),
+            context->src1Scale + b * (globK / 32) * globN);
+    }
+    BENCHEND;
+    return 0;
+}
+
 int main() {
-    using dtype = LOWP_DTYPE;
     // Packed FP4x2 formats store two logical K values in each C++ element.
     // Their scale tensors still use the logical K dimension: one byte per 32
     // FP4 values, matching HiF4_HiF4.cpp's physical-K / 16 convention.
@@ -89,17 +119,12 @@ int main() {
 #endif
 #endif
 
-    BENCHSTART;
-    for (int b = 0; b < Batch; ++b) {
-        matmul_shared_lowp<dtype, PACKED_FACTOR, USE_MX != 0,
-                           globM, globN, globK, tilM, tilN, tilK>(
-            dst + b * globM * globN,
-            src0 + b * globM * kStoredGK,
-            src1 + b * kStoredGK * globN,
-            src0Scale + b * globM * (globK / 32),
-            src1Scale + b * (globK / 32) * globN);
-    }
-    BENCHEND;
+    LowpMatmulContext context{src0, src1, src0Scale, src1Scale, dst};
+#ifdef LINX_GROUP_RUNTIME
+    const int status = linx_group_run(&context);
+#else
+    const int status = __linx_group_worker_main(0, &context);
+#endif
 
 #ifdef RES_CHECK
 #define RES_PATH CHK_DIR "/res.bin"
@@ -107,5 +132,5 @@ int main() {
                     Batch * globM * globN * sizeof(float));
 #endif
 
-    return 0;
+    return status;
 }
