@@ -4,7 +4,7 @@
 
 #include "benchmark.h"
 #include "fileop.h"
-#include "linx_group_runtime.h"
+#include <common/linx_group_runtime.h>
 
 // Element data type for the A/B input tiles. Set via -DDTYPE=<token> from the
 // Makefile (float / __bf16 / __half). The output C tile stays FP32 inside the

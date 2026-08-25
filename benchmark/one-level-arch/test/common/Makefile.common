@@ -25,8 +25,7 @@ LINK_SCRIPT =  $(patsubst %.S, %, $(subst $(TEST_ROOT), $(OBJ_ROOT), $(LINK_SCRI
 PLAT ?= linx
 baremetal ?= off
 group_runtime ?= off
-GROUP_RUNTIME_SRC := $(TEST_ROOT)/$(COMM_SRC_DIR)/linx_group_runtime.cpp
-GROUP_RUNTIME_OBJ := $(OBJ_ROOT)/$(COMM_SRC_DIR)/linx_group_runtime.o
+RUNTIME_LIBS :=
 
 ifeq ($(PLAT), cpu)
 DEFINES += -D__cpu_sim__
@@ -115,7 +114,7 @@ DEFINES += -DCHK_DIR=\"$(ROOT)/compare/$(notdir $(basename $(TARGET)))\"
 CC_LINK = -static
 ifeq ($(group_runtime), on)
 DEFINES += -DLINX_GROUP_RUNTIME
-COMM_OBJ = $(GROUP_RUNTIME_OBJ)
+RUNTIME_LIBS += -llinx_builtin_rt
 endif
 endif
 
@@ -160,16 +159,12 @@ $(OBJ_ROOT)/$(COMM_SRC_DIR)%.o: $(TEST_ROOT)/$(COMM_SRC_DIR)%.s
 	@mkdir -p $(shell dirname $@)
 	$(CXX) -mlxbc -c -O2 -Wno-return-type -Wno-deprecated -Wno-unused-command-line-argument -Wno-invalid-noreturn $(INCLUDE) $(DEFINES) $< -o $@
 
-$(GROUP_RUNTIME_OBJ): $(GROUP_RUNTIME_SRC)
-	@mkdir -p $(shell dirname $@)
-	$(CXX) $(CXX_O_ALL) $(INCLUDE) $(DEFINES) $< -o $@
-
 $(OBJ_ROOT)/$(COMM_SRC_DIR)%.lds : $(TEST_ROOT)/$(COMM_SRC_DIR)%.lds.S
 	$(CC) $(DEFINES) $(INCLUDE) -E -P -C -o $@ $<
 
 $(TARGET): clean $(LINK_SCRIPT) $(COMM_OBJ) $(OBJ) $(EXTRA_OBJ_FILES)
 	@mkdir -p $(shell dirname $@)
-	$(LINK) $(CC_LINK) $(OBJ) $(COMM_OBJ) $(EXTRA_OBJ_FILES) -o $@
+	$(LINK) $(CC_LINK) $(OBJ) $(COMM_OBJ) $(EXTRA_OBJ_FILES) $(RUNTIME_LIBS) -o $@
 
 pre_work:
 	@mkdir -p $(OBJ_DIR)

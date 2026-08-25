@@ -1,4 +1,4 @@
-#include "linx_group_runtime.h"
+#include <common/linx_group_runtime.h>
 
 #include <stdint.h>
 

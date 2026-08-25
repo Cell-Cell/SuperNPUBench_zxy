@@ -4,7 +4,7 @@
 
 #include "benchmark.h"
 #include "fileop.h"
-#include "linx_group_runtime.h"
+#include <common/linx_group_runtime.h>
 
 #ifndef LOWP_DTYPE
 #define LOWP_DTYPE __fp8_e4m3
