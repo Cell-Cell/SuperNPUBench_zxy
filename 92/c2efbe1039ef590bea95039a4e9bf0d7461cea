@@ -1,0 +1,36 @@
+benchmark/one-level-arch/kernels/moe_dispatch/moe_dispatch_v2.hpp
+  s_2fc5dac4ded1f9::t_b1964c64a1f1d5 1209-1210,1212,1222-1226
+  s_2fc5dac4ded1f9::t_332b61a6883442 568-572
+  s_2fc5dac4ded1f9::t_2b5e5f00a7fe5e 658-664,666-670
+  s_2fc5dac4ded1f9::t_64c902c5ba6bb9 637-655
+  s_2fc5dac4ded1f9::t_c27cc8810ef8c8 1116-1134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "92c2efbe1039ef590bea95039a4e9bf0d7461cea",
+  "prompts": {},
+  "sessions": {
+    "s_2fc5dac4ded1f9": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a8d04e4e103138c69c76a04",
+        "model": "glm-5.3"
+      },
+      "human_author": "Cell-Cell <2601732551@qq.com>",
+      "custom_attributes": {
+        "tool_type": "builtin",
+        "dedupe_key": "6a8d04e4e103138c69c76a04:6a8d4e41e103138c69c76d40:afterEdit:74ab2ccd",
+        "session_id": "6a8d04e4e103138c69c76a04",
+        "tool_use_id": "6a8d4e41e103138c69c76d40",
+        "client_type": "ide",
+        "runtime_client": "trae-tob-git-ai",
+        "source_scene": "agent",
+        "operation_id": "6a8d4e41e103138c69c76d40",
+        "tool_id": "icube:applyChatSnapshotPatch",
+        "external_session_id": "6a8d04e4e103138c69c76a04",
+        "edit_kind": "file_edit"
+      }
+    }
+  }
+}
