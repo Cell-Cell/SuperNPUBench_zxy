@@ -1,0 +1,66 @@
+diff --git a/TimingSim/frontend/bctrl/bfu/bfu.cpp b/TimingSim/frontend/bctrl/bfu/bfu.cpp
+index 3fe784c..6e60de5 100644
+--- a/TimingSim/frontend/bctrl/bfu/bfu.cpp
++++ b/TimingSim/frontend/bctrl/bfu/bfu.cpp
+@@ -2666,6 +2666,12 @@ void BFU::PipeMove() {
+ }
+ 
+ void BFU::CreateNewInfoToFetchQ(addr_t va, addr_t va_prev, addr_t tag, uint32_t stid, bool first_after_redirect) {
++    if (va == 0) {
++        LOG_ERROR_M(Unit::BFU, Stage::NA) << "fetchq_zero_va fbid_next=" << dec << (fbid_global + 1)
++                                          << " va_prev=0x" << hex << va_prev << " tag=0x" << tag
++                                          << " stid=" << dec << stid
++                                          << " first_after_redirect=" << first_after_redirect;
++    }
+     fbid_global++;
+     PtrFB fb = std::make_shared<FetchBundle>(va, va_prev, first_after_redirect, fbid_global, 0, GetSim()->getCycles());
+     fb->tag = tag;
+diff --git a/TimingSim/frontend/bctrl/bfu/bfu_bhc.cpp b/TimingSim/frontend/bctrl/bfu/bfu_bhc.cpp
+index b6d4cd7..38b9bda 100644
+--- a/TimingSim/frontend/bctrl/bfu/bfu_bhc.cpp
++++ b/TimingSim/frontend/bctrl/bfu/bfu_bhc.cpp
+@@ -1,4 +1,4 @@
+-﻿#include "bctrl/bfu/bfu_bhc.h"
++#include "bctrl/bfu/bfu_bhc.h"
+ 
+ #include <algorithm>
+ #include <cstdint>
+@@ -85,6 +85,10 @@ bool BHC::fetch(PtrFB const& fb) {
+                                 fb->fbid, fb->fbid_local, va_cl, pa_cl, n);
+             } else {
+                 // add to missq
++                if (pa_cl == 0) {
++                    LOG_ERROR_M(Unit::BFU, Stage::NA) << "bhc_miss_zero_pa PERMANENT-STALL fbid=" << dec << fb->fbid
++                                                       << " va=0x" << hex << fb->va << dec << " stid=" << fb->stid;
++                }
+                 if (pa_cl != 0) {
+                     missq.emplace_back(va_cl, pa_cl, fb->stid, false, bfu->GetSim()->getCycles());
+                     if (cfg->debug_enable) {
+diff --git a/TimingSim/frontend/bctrl/bfu/bfu_brq.cpp b/TimingSim/frontend/bctrl/bfu/bfu_brq.cpp
+index 79500ec..24c8f84 100644
+--- a/TimingSim/frontend/bctrl/bfu/bfu_brq.cpp
++++ b/TimingSim/frontend/bctrl/bfu/bfu_brq.cpp
+@@ -1,4 +1,4 @@
+-﻿#include "bctrl/bfu/bfu_brq.h"
++#include "bctrl/bfu/bfu_brq.h"
+ 
+ #include <algorithm>
+ #include <cassert>
+@@ -239,6 +239,17 @@ bool BRQ::ResolveHeader(PtrMachineInst const& machineInst) {
+             fb->redir_info.tgt = machineInst->bfuInfo->resolve_taken ? utils->CalcStaticTarget(machineInst) : utils->NextBlockPC(machineInst);
+         }
+         machineInst->bfuInfo->resolve_tgt = fb->redir_info.tgt;
++        if (fb->redir_info.tgt == 0) {
++            LOG_ERROR_M(Unit::BFU, Stage::NA) << "redir_zero_tgt"
++                << " pc=0x" << hex << machineInst->GetBundlePosPC()
++                << " fb_va=0x" << fb->va
++                << " isCond=" << dec << machineInst->IsCond()
++                << " isFallthrough=" << machineInst->IsFallthrough()
++                << " branchType=" << dec << (uint32_t)machineInst->GetBranchType()
++                << " resolve_taken=" << machineInst->bfuInfo->resolve_taken
++                << " fbid=" << dec << fb->fbid
++                << " raw_resolve_tgt=0x" << hex << machineInst->bfuInfo->resolve_tgt;
++        }
+         // mark the mhdrs after the mispredict pos as invalid
+         // TODO (sufang): try removing the following code
+         bool bend = false;
