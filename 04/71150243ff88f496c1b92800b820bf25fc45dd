@@ -1,0 +1,34 @@
+benchmark/one-level-arch/kernels/moe_dispatch/moe_dispatch_v2.hpp
+  s_2fc5dac4ded1f9::t_4770b1fffa832d 218-219
+  s_2fc5dac4ded1f9::t_760a10a7640587 1135-1146
+  s_2fc5dac4ded1f9::t_9f54a8135b263a 624-634
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "0471150243ff88f496c1b92800b820bf25fc45dd",
+  "prompts": {},
+  "sessions": {
+    "s_2fc5dac4ded1f9": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a8d04e4e103138c69c76a04",
+        "model": "glm-5.3"
+      },
+      "human_author": "Cell-Cell <2601732551@qq.com>",
+      "custom_attributes": {
+        "tool_type": "builtin",
+        "operation_id": "6a8d59a8e103138c69c76e72",
+        "tool_use_id": "6a8d59a8e103138c69c76e72",
+        "session_id": "6a8d04e4e103138c69c76a04",
+        "external_session_id": "6a8d04e4e103138c69c76a04",
+        "client_type": "ide",
+        "tool_id": "icube:applyChatSnapshotPatch",
+        "edit_kind": "file_edit",
+        "dedupe_key": "6a8d04e4e103138c69c76a04:6a8d59a8e103138c69c76e72:afterEdit:74ab2ccd",
+        "source_scene": "agent",
+        "runtime_client": "trae-tob-git-ai"
+      }
+    }
+  }
+}
