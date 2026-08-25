@@ -213,14 +213,10 @@ void moe_dispatch_v2(
     using tile_o = Tile<Location::Vec, XOutType, 1, TileW, BLayout::RowMajor>;
     using tile_fl = Tile<Location::Vec, float, 1, 32, BLayout::RowMajor>;
     using gm_x = global_tensor<XInType, RowMajor<BS, H>>;
-    using it_x = global_iterator<gm_x, tile_h>;
-    using gm_out = global_tensor<XOutType, RowMajor<slotCount, H>>;
-    using it_out = global_iterator<gm_out, tile_o>;
     using gm_w = global_tensor<XOutType, RowMajor<1, TileW>>;
     using gm_fl = global_tensor<float, RowMajor<1, 32>>;
-
-    it_x x_iter(x);
-    it_out out_iter(expandXOut);
+    (void)sizeof(tile_h); (void)sizeof(tile_o); (void)sizeof(tile_fl);
+    (void)sizeof(gm_x); (void)sizeof(gm_w); (void)sizeof(gm_fl);
 
     // ==================== SetTilingData (A:662-690) ==================== //
     uint32_t axisBS_ = BS;
@@ -625,13 +621,17 @@ void moe_dispatch_v2(
         if constexpr (QuantMode > UNQUANT) {
             // quantInst_.QuantProcess — compiled out under UNQUANT
         } else {
-            // TLOAD token data from GM → TSTORE to window data area (per tile)
-            for (int t = 0; t < HTiles; t++) {
-                auto gin = x_iter(srcTokenIndex, t);
-                tile_h dataTile;
-                TLOAD(dataTile, gin);
-                gm_w gmDst(reinterpret_cast<XOutType*>(wAddr) + t * TileW);
-                TSTORE(gmDst, dataTile);
+            // Fix (A3 compliance): copy token data GM → window with scalar
+            // accesses. The previous TLOAD/TSTORE tile writes to the window
+            // shared 512B blocks with the scalar repack/flag writes below —
+            // a tile access may never share a block with a scalar one
+            // (spec 1.4b:252-258); gfsim reports a3_tile_violation and the
+            // TLSU pipeline deadlocks. All window-slot accesses are scalar
+            // now, so each window block only ever sees scalar traffic.
+            const XInType* src = x + (uint64_t)srcTokenIndex * H;
+            XOutType* dst = reinterpret_cast<XOutType*>(wAddr);
+            for (uint32_t e = 0; e < H; e++) {
+                dst[e] = static_cast<XOutType>(src[e]);
             }
         }
         // Fix (issue #348): block packing — original Ascend C writes the token
@@ -1132,13 +1132,18 @@ void moe_dispatch_v2(
                 }
             }
 
-            // 1) Read token data from window → expandXOut (TLOAD → TSTORE per tile)
-            for (int t = 0; t < HTiles; t++) {
-                gm_w gmData(reinterpret_cast<XOutType*>(slotAddr) + t * TileW);
-                tile_h dataTile;
-                TLOAD(dataTile, gmData);
-                auto gout = out_iter(curDstPosition, t);
-                TSTORE(gout, dataTile);
+            // 1) Read token data from window → expandXOut
+            // Fix (A3 compliance): scalar copy. The previous TLOAD tile reads
+            // from the window shared 512B blocks with the scalar unpack loop
+            // above — a tile access may never share a block with a scalar one
+            // (spec 1.4b:252-258); gfsim reports a3_tile_violation and the
+            // TLSU pipeline deadlocks.
+            {
+                const XOutType* src = reinterpret_cast<const XOutType*>(slotAddr);
+                XOutType* dst = expandXOut + (uint64_t)curDstPosition * H;
+                for (uint32_t e = 0; e < H; e++) {
+                    dst[e] = src[e];
+                }
             }
 
             // 2) Read triple from window → expandIdxOut (scalar: 3 int32)
