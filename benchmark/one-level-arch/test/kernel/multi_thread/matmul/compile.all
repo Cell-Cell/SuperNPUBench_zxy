@@ -36,3 +36,13 @@ for mode in FP8 HIFP8 HIF4X2 MXFP8 MXFP4; do
         COMPILER_DIR="$COMPILER_DIR" \
         B=1 M=256 N=256 K=256 tM=128 tN=64 tK=64
 done
+
+# PTO 0.58.3 explicit CUBE CELL output variants. Both primaries are complete
+# Shared matrices; each PE receives an M16/M32 Local accumulator row slice.
+make diss TESTCASE=matmul_shared_cube_layout \
+    COMPILER_DIR="$COMPILER_DIR" \
+    DTYPE=float B=1 M=256 N=256 K=256 tM=128 tN=32 tK=64
+
+make diss TESTCASE=matmul_shared_cube_layout \
+    COMPILER_DIR="$COMPILER_DIR" \
+    DTYPE=__bf16 B=1 M=256 N=256 K=256 tM=64 tN=32 tK=64
