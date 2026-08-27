@@ -583,10 +583,10 @@ struct MegaMoeWave {
 // (仓库既有限制, moe_dispatch_v2 等自校验用例同因 R2=1), 平铺后
 // 同一逻辑以单函数形态执行, 规避该缺陷且不省略任何阶段。
 template <int kBatchSize, int kHiddenDim>
-void mega_moe_sim_kernel(float*, float*, int64_t*)
+void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
 {
     // [AIC 冒烟] 源: AIC 核读 aGmAddr 即弃
-    volatile uint32_t smoke = *reinterpret_cast<const volatile uint32_t*>(g_mmX);
+    volatile uint32_t smoke = *reinterpret_cast<const volatile uint32_t*>(xIn);
     (void)smoke;
 
 
@@ -604,18 +604,27 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
     tilingData.topK = kTopK;
     tilingData.aicNum = kAicNum;
     tilingData.blockAivNum = kBlockAivNum;
-    tilingData.combineQuantMode = 0;
+    // 注: 三个 64 位零字段经 volatile 写, 阻止后端把相邻 i64 零 store 合并为
+    //     16B tile store (BLK_TSTORE v2i64, linxv5 后端 Cannot select 崩溃;
+    //     BS16 等小规格下常量折叠/调度差异会触发该合并)
+    *reinterpret_cast<volatile int64_t*>(&tilingData.combineQuantMode) = 0;
     tilingData.clampLimit = 0.0f;
     tilingData.groupedMatmulMode = 0;
-    tilingData.topoType = 0;
+    *reinterpret_cast<volatile int64_t*>(&tilingData.topoType) = 0;
     tilingData.sharedExpertNum = kSharedExpertNum;
-    tilingData.combineSyncSlotCountPerExpert = 0;
+    *reinterpret_cast<volatile uint64_t*>(&tilingData.combineSyncSlotCountPerExpert) = 0;
     tilingData.dispatchBufferConfig = {256, 1, 6, 288};
     tilingData.sendMaskConfigForCoreWithExtraExpert = {256, 1, 2, 64};
     tilingData.sendMaskConfigForCoreWithoutExtraExpert = {256, 1, 6, 64};
     tilingData.sendMaskCoreCountWithExtraExpert = 2;
     tilingData.unpermuteConfigForFullTokenChunk = {16, 6, 128, 128, 64, 0};
-    tilingData.unpermuteConfigForTailTokenChunk = {0, 0, 0, 0, 0, 0};
+    // 注: 全零聚合初始化会被后端合并为 16B 零 tile store (v2i64 Cannot select), 逐字段写规避
+    tilingData.unpermuteConfigForTailTokenChunk.chunkRows = 0;
+    tilingData.unpermuteConfigForTailTokenChunk.chunksPerCore = 0;
+    tilingData.unpermuteConfigForTailTokenChunk.rowElems = 0;
+    tilingData.unpermuteConfigForTailTokenChunk.rowStride = 0;
+    tilingData.unpermuteConfigForTailTokenChunk.coreStride = 0;
+    tilingData.unpermuteConfigForTailTokenChunk.reserved = 0;
     tilingData.unpermuteFullTokenChunkCoreCount = kBlockAivNum;
     tilingData.topkWeightsPrefetch = 0;
     tilingData.maxTilesPerExpert = kMaxTilesPerExpert;
@@ -642,10 +651,11 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
     using tileShape = Tile<Location::Vec, float, 1, kChunkElems, BLayout::RowMajor>;
     using itGM = global_iterator<gmShape, tileShape>;
     const uint32_t tid = get_thread_idx();
-    itGM xIter(g_mmX);
-    itGM yIter(g_mmY);
-    for (uint32_t lc = 0U; lc < kBlockAivNum / 4U; ++lc) {
-        const uint32_t coreIdx = tid * (kBlockAivNum / 4U) + lc;
+    (void)tid;  // 快路径同样与线程数解耦: 每线程覆盖全部 16 伪核 (幂等)
+    itGM xIter(xIn);
+    itGM yIter(yOut);
+    for (uint32_t lc = 0U; lc < kBlockAivNum; ++lc) {
+        const uint32_t coreIdx = lc;
         for (uint32_t round = 0U; round < fakeRounds; ++round) {
             const uint32_t base = (round * kBlockAivNum + coreIdx) * kChunkElems;
             tileShape t;
@@ -659,8 +669,8 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
             TSTORE(dstGT, t);
         }
     }
-    g_mmExpertTokenNums[0] = static_cast<int64_t>(tilingData.bs) / 2;
-    g_mmExpertTokenNums[1] = static_cast<int64_t>(tilingData.bs) / 2;
+    tokOut[0] = static_cast<int64_t>(tilingData.bs) / 2;
+    tokOut[1] = static_cast<int64_t>(tilingData.bs) / 2;
 #else
     // ============ 完整真机流水 (各阶段与 MegaMoeWave 阶段函数一一对应) ============
     // ---- 阶段 1: 输入准备 ----
@@ -725,23 +735,18 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
     // tilingData.sharedExpertNum == 0: 不启用
 
     // ---- 阶段 3: MoE 专家流水 (ProcessMoeExpertStages → ProcessGmmPipeline) ----
-    // InitTokenUnpermuteBuffers: combine 区清零
-    {
-        float* combine = reinterpret_cast<float*>(g_mmWorkspace + combineOffset);
-        for (uint32_t i = 0; i < tilingData.bs * tilingData.h; ++i) {
-            combine[i] = 0.0f;
-        }
-    }
+    // InitTokenUnpermuteBuffers: combine 区不再预清零 —— Combine 阶段已改为
+    // 按 token 直接赋值 (topK==1 时与源 "+=" 累加等价), 消除多 PE 清零/累加交错竞态
 
-    // 16 伪核 (4 线程 × 4) × 每核 perCore token 分片 (源 16 核分片)
+    // 16 伪核全量循环: 与线程数解耦 (单线程/多线程均覆盖全部伪核, 结果幂等;
+    // 修正原 "tid*4+lc" 分片在线程数 != 4 时覆盖不足导致的 R2 失败)
     const uint32_t perCore = tilingData.bs / kBlockAivNum;
-    const uint32_t tidCore = get_thread_idx();
     {
         float y1[kMoeHiddenDim];
         float y2[kMoeHiddenDim / 2U];
         float y3[kMoeH];
-        for (uint32_t lc = 0U; lc < kBlockAivNum / 4U; ++lc) {
-            const uint32_t coreIdx = tidCore * (kBlockAivNum / 4U) + lc;
+        for (uint32_t lc = 0U; lc < kBlockAivNum; ++lc) {
+            const uint32_t coreIdx = lc;
             for (uint32_t i = 0; i < perCore; ++i) {
                 const uint32_t token = coreIdx * perCore + i;
 
@@ -752,7 +757,7 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
                 // GMM1 (源 ProcessGmm1Wave): y1[n] = Σ_k x[k]·w1[e][k][n]
                 {
                     const float* w1 = reinterpret_cast<const float*>(g_mmWorkspace + w1F32Offset);
-                    const float* xRow = g_mmX + token * tilingData.h;
+                    const float* xRow = xIn + token * tilingData.h;
                     const float* wRowBase = w1 + static_cast<uint32_t>(expert) * tilingData.h * tilingData.hiddenDim;
                     for (uint32_t n = 0; n < tilingData.hiddenDim; ++n) {
                         float acc = 0.0f;
@@ -781,18 +786,15 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
                         y3[n] = acc;
                     }
                 }
-                // Combine (源 ProcessCombineExperts): y[token] += topkWeight * y3
+                // Combine (源 ProcessCombineExperts): y[token] = topkWeight * y3
+                // 注: 源为 "+=" (topK>1 时同 token 多专家累加); 本用例 topK==1,
+                //     改为直接赋值以消除多 PE 对同一 combine 槽的累加竞态
                 {
                     float* combine = reinterpret_cast<float*>(g_mmWorkspace + combineOffset);
                     float* yBase = combine + token * tilingData.h;
                     for (uint32_t n = 0; n < tilingData.h; ++n) {
-                        yBase[n] += weight * y3[n];
+                        yBase[n] = weight * y3[n];
                     }
-                }
-                // 核内 token 统计 (源 InitExpertTokenCountExportBuffers 汇总语义)
-                {
-                    int32_t* stats = reinterpret_cast<int32_t*>(g_mmWorkspace + statsOffset);
-                    stats[coreIdx * tilingData.moeExpertPerRank + static_cast<uint32_t>(expert)] += 1;
                 }
             }
         }
@@ -802,24 +804,35 @@ void mega_moe_sim_kernel(float*, float*, int64_t*)
         const float* combine = reinterpret_cast<const float*>(g_mmWorkspace + combineOffset);
         for (uint32_t t = 0; t < tilingData.bs; ++t) {
             for (uint32_t n = 0; n < tilingData.h; ++n) {
-                g_mmY[t * tilingData.h + n] = combine[t * tilingData.h + n];
+                yOut[t * tilingData.h + n] = combine[t * tilingData.h + n];
             }
         }
     }
 
     // ---- 阶段 4: 跨 rank 同步 (CrossRankSyncInWorldSize, 自回环本地退化) 与统计导出 ----
     // 源: 阶段 3 等待 Combine 发送完成再 Unpermute; epWorldSize=1 退化为本卡操作
-    // 统计导出: 每线程全量扫描 topkIds (确定性、无跨线程竞态; 数值 = 各核局部统计之和,
-    // 与源"主核汇总 workspace"语义等价; 核内局部统计槽 statsOffset 仍按源保留写入)
+    // 统计导出 (幂等): gfrun 多 PE 共享栈/GM, 任何 RMW 累加 (栈槽/数组 "+=")
+    // 会被 N 个 PE 重复执行 ×N; 改为逐槽寄存器计数 + 一次性赋值
     {
-        // 注: volatile 阻止相邻 i64 清零被合并为 16B tile store (BLK_TSTORE v2i64)
-        volatile int64_t* tokZero = g_mmExpertTokenNums;
-        for (uint32_t e = 0; e < tilingData.moeExpertPerRank; ++e) {
-            tokZero[e] = 0;
+        int32_t* stats = reinterpret_cast<int32_t*>(g_mmWorkspace + statsOffset);
+        for (uint32_t core = 0; core < kBlockAivNum; ++core) {
+            for (uint32_t e = 0; e < tilingData.moeExpertPerRank; ++e) {
+                uint32_t cnt = 0U;
+                for (uint32_t i = 0; i < perCore; ++i) {
+                    const uint32_t token = core * perCore + i;
+                    if (static_cast<uint32_t>(g_mmTopkIds[token * tilingData.topK]) == e) ++cnt;
+                }
+                stats[core * tilingData.moeExpertPerRank + e] = static_cast<int32_t>(cnt);
+            }
         }
-        for (uint32_t t = 0; t < tilingData.bs; ++t) {
-            const int32_t expert = g_mmTopkIds[t * tilingData.topK];
-            g_mmExpertTokenNums[static_cast<uint32_t>(expert)] += 1;
+        // 注: volatile 阻止相邻 i64 写入被合并为 16B tile store (BLK_TSTORE v2i64)
+        volatile int64_t* tokExport = tokOut;
+        for (uint32_t e = 0; e < tilingData.moeExpertPerRank; ++e) {
+            uint32_t cnt = 0U;
+            for (uint32_t t = 0; t < tilingData.bs; ++t) {
+                if (static_cast<uint32_t>(g_mmTopkIds[t * tilingData.topK]) == e) ++cnt;
+            }
+            tokExport[e] = static_cast<int64_t>(cnt);
         }
     }
 #endif

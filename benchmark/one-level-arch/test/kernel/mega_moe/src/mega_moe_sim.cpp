@@ -79,7 +79,11 @@ static double exp2_approx(double p)
 {
     double r = 1.0;
     int32_t ip = (int32_t)p;
-    for (int32_t i = 0; i < ip; ++i) r *= 2.0;
+    if (ip > 0) {
+        for (int32_t i = 0; i < ip; ++i) r *= 2.0;
+    } else if (ip < 0) {
+        for (int32_t i = 0; i < -ip; ++i) r *= 0.5;   // [fix] e4m3 指数域 e<7 时 p<0, 原实现缺失负分支恒返回 1.0
+    }
     return r;
 }
 
@@ -139,11 +143,20 @@ static void compute_golden(double* yRef, int64* tokRef)
     volatile int64* tokV = tokRef;
     tokV[0] = 0;
     tokV[1] = 0;
+    // [fix] 多 PE 共享栈/GM: "tokRef[e] += 1" 会被 4 个 PE 重复执行 ×4;
+    //       改为寄存器计数 + 幂等写 (与 kernel 侧统计导出同模式)
+    {
+        uint32_t c0 = 0U;
+        for (uint32 t = 0; t < kBS; ++t) {
+            if ((uint32)g_mmTopkIds[t] == 0U) ++c0;
+        }
+        tokV[0] = (int64)c0;
+        tokV[1] = (int64)(kBS - c0);
+    }
 
     for (uint32 t = 0; t < kBS; ++t) {
         const uint32 expert = (uint32)g_mmTopkIds[t];
         const double weight = (double)g_mmTopkWeights[t];
-        tokRef[expert] += 1;
 
         // GMM1: y1[n] = Σ_k x[k]·w1[e][k][n]
         double y1[kHiddenDim];
@@ -170,9 +183,9 @@ static void compute_golden(double* yRef, int64* tokRef)
             }
             y3[n] = acc;
         }
-        // Combine: y[t] += weight * y3
+        // Combine: y[t] = weight * y3 (topK==1; 原 "+=" 在多 PE 下对共享 GM 重复累加 ×4)
         for (uint32 n = 0; n < kH; ++n) {
-            yRef[t * kH + n] += weight * y3[n];
+            yRef[t * kH + n] = weight * y3[n];
         }
     }
 }
@@ -210,9 +223,14 @@ int main()
         }
     }
     // 路由: 与 gen_data 同规则 topk_ids = (i//128)%2, 权重 1.0
-    for (uint32 t = 0; t < kBS; ++t) {
-        g_mmTopkIds[t] = (int32_t)((t / (kBS / 2u)) % 2u);   // 与 gen_data 同规则
-        g_mmTopkWeights[t] = 1.0f;
+    // 注: ids 经 volatile 写 —— BS16 等小规格下循环全展开, 前 kBS/2 个 i32 零 store
+    //     会被后端合并为 16B 零 tile store (v2i64 Cannot select 崩溃)
+    {
+        volatile int32_t* ids = g_mmTopkIds;
+        for (uint32 t = 0; t < kBS; ++t) {
+            ids[t] = (int32_t)((t / (kBS / 2u)) % 2u);   // 与 gen_data 同规则
+            g_mmTopkWeights[t] = 1.0f;
+        }
     }
     // FP8 权重: 小随机值 (E4M3 可表示), scale 取 1.0 (E8M0 0x00 → 2^0)
     {
