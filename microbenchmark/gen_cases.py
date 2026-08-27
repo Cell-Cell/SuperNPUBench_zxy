@@ -294,6 +294,10 @@ int main() {{
     elif c.kind == "concat":
         # src0=M×K, src1=M×K, dst=M×2K (K=32/sizeof(D)); arrays sized for max (fp16 K=16->dst 32 cols)
         body = f"    bench_concat<{ct},M>(c,a,b,[](auto& dst,auto& s0,auto& s1){{ {op}(dst,s0,s1); }});\n"
+    elif c.op == "TROWEXPAND":
+        body = f"    bench_expand_copy_row<{ct},M,N>(c,a,[](auto& dst,auto& s){{ {op}(dst,s); }});\n"
+    elif c.op == "TCOLEXPAND":
+        body = f"    bench_expand_copy_col<{ct},M,N>(c,a,[](auto& dst,auto& s){{ {op}(dst,s); }});\n"
     elif c.kind == "unary":
         body = f"    bench_unary<{ct},M,N>(c,a,[](auto& dst,auto& s){{ {op}(dst,s); }});\n"
     elif c.kind == "ternary":

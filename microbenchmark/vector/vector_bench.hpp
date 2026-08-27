@@ -40,9 +40,8 @@ void bench_binary(D *c, D *a, D *b, auto op) {
 // (K = 32/sizeof(D): fp16->16, fp32->8), per tileop-usage "PTO Mode 2 每行 32B 数据条"
 template <typename D, int M, int N>
 void bench_expand_row(D *c, D *a, D *b, auto op) {
-    constexpr int K = 32 / sizeof(D);
-    using gmB = global_tensor<D, RowMajor<M, K>>;
-    using tileB = Tile<Location::Vec, D, M, K, BLayout::RowMajor>;
+    using gmB = global_tensor<D, RowMajor<M, 1>>;
+    using tileB = Tile<Location::Vec, D, M, 1, BLayout::RowMajor>;
     using itB = global_iterator<gmB, tileB>;
     iter_t<D, M, N> gA(a), gC(c); itB gB(b);
     auto gA0 = gA(0, 0);
@@ -59,8 +58,8 @@ void bench_expand_row(D *c, D *a, D *b, auto op) {
 template <typename D, int M, int N>
 void bench_expand_col(D *c, D *a, D *b, auto op) {
     constexpr int K = 32 / sizeof(D);
-    using gmB = global_tensor<D, RowMajor<K, N>>;
-    using tileB = Tile<Location::Vec, D, K, N, BLayout::RowMajor>;
+    using gmB = global_tensor<D, RowMajor<1, N>>;
+    using tileB = Tile<Location::Vec, D, K, N, BLayout::RowMajor, 1, N>;
     using itB = global_iterator<gmB, tileB>;
     iter_t<D, M, N> gA(a), gC(c); itB gB(b);
     auto gA0 = gA(0, 0);
@@ -106,6 +105,31 @@ void bench_unary(D *c, D *a, auto op) {
     TLOAD(tA, gA0);
     op(tC, tA);
     TSTORE(gC0, tC);
+}
+
+// Copy expansion has only the broadcast source, unlike the binary arithmetic
+// expansion forms above. Keep its valid shape distinct from physical padding.
+template <typename D, int M, int N>
+void bench_expand_copy_row(D *c, D *a, auto op) {
+    using gmA = global_tensor<D, RowMajor<M, 1>>;
+    using tileA = Tile<Location::Vec, D, M, 1, BLayout::RowMajor>;
+    using itA = global_iterator<gmA, tileA>;
+    itA gA(a); iter_t<D, M, N> gC(c);
+    auto gA0 = gA(0, 0); auto gC0 = gC(0, 0);
+    tileA tA; tile_t<D, M, N> tC;
+    TLOAD(tA, gA0); op(tC, tA); TSTORE(gC0, tC);
+}
+
+template <typename D, int M, int N>
+void bench_expand_copy_col(D *c, D *a, auto op) {
+    constexpr int K = 32 / sizeof(D);
+    using gmA = global_tensor<D, RowMajor<1, N>>;
+    using tileA = Tile<Location::Vec, D, K, N, BLayout::RowMajor, 1, N>;
+    using itA = global_iterator<gmA, tileA>;
+    itA gA(a); iter_t<D, M, N> gC(c);
+    auto gA0 = gA(0, 0); auto gC0 = gC(0, 0);
+    tileA tA; tile_t<D, M, N> tC;
+    TLOAD(tA, gA0); op(tC, tA); TSTORE(gC0, tC);
 }
 
 // dst = cond ? src0 : src1. PTO v0.58 uses a uint16 condition tile.
