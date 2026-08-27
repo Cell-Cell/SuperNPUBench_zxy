@@ -50,6 +50,8 @@
 
 int main() {
     using dtype = LOWP_DTYPE;
+    constexpr uint32_t kIoTid = 0;
+    const uint32_t tid = get_thread_idx();
     // Packed FP4x2 formats store two logical K values in each C++ element.
     // Their scale tensors still use the logical K dimension: one byte per 32
     // FP4 values, matching HiF4_HiF4.cpp's physical-K / 16 convention.
@@ -75,18 +77,20 @@ int main() {
 #ifdef RES_CHECK
 #define SRC0_PATH CHK_DIR "/src0.bin"
 #define SRC1_PATH CHK_DIR "/src1.bin"
-    readBinaryFile(SRC0_PATH, (uint8_t *)src0,
-                   Batch * globM * kStoredGK * sizeof(dtype));
-    readBinaryFile(SRC1_PATH, (uint8_t *)src1,
-                   Batch * kStoredGK * globN * sizeof(dtype));
+    if (tid == kIoTid) {
+        readBinaryFile(SRC0_PATH, (uint8_t *)src0,
+                       Batch * globM * kStoredGK * sizeof(dtype));
+        readBinaryFile(SRC1_PATH, (uint8_t *)src1,
+                       Batch * kStoredGK * globN * sizeof(dtype));
 #if USE_MX
 #define SRC0_SCALE_PATH CHK_DIR "/src0_scale.bin"
 #define SRC1_SCALE_PATH CHK_DIR "/src1_scale.bin"
-    readBinaryFile(SRC0_SCALE_PATH, src0Scale,
-                   Batch * globM * (globK / 32));
-    readBinaryFile(SRC1_SCALE_PATH, src1Scale,
-                   Batch * (globK / 32) * globN);
+        readBinaryFile(SRC0_SCALE_PATH, src0Scale,
+                       Batch * globM * (globK / 32));
+        readBinaryFile(SRC1_SCALE_PATH, src1Scale,
+                       Batch * (globK / 32) * globN);
 #endif
+    }
 #endif
 
     BENCHSTART;
@@ -103,8 +107,10 @@ int main() {
 
 #ifdef RES_CHECK
 #define RES_PATH CHK_DIR "/res.bin"
-    writeBinaryFile(RES_PATH, (uint8_t *)dst,
-                    Batch * globM * globN * sizeof(float));
+    if (tid == kIoTid) {
+        writeBinaryFile(RES_PATH, (uint8_t *)dst,
+                        Batch * globM * globN * sizeof(float));
+    }
 #endif
 
     return 0;
