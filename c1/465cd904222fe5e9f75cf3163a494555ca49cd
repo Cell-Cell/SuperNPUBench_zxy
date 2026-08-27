@@ -1,0 +1,47 @@
+benchmark/one-level-arch/kernels/mega_moe/mega_moe_sim.hpp
+  s_2fc5dac4ded1f9::t_9ee721f4fa41b0 760
+  s_2fc5dac4ded1f9::t_fb1cc770e7e3fb 586,589
+  s_2fc5dac4ded1f9::t_f3afcede5b409e 607-610,613,615
+  s_2fc5dac4ded1f9::t_3c5d81c8c35e9d 622-626
+  s_2fc5dac4ded1f9::t_e220ed4c482389 789-791,796
+  s_2fc5dac4ded1f9::t_d181106256bc06 654-658,672-673
+  s_2fc5dac4ded1f9::t_8f7441f6c8f20c 814-815,820-825,831-835
+  s_2fc5dac4ded1f9::t_bf15d9fb909dba 621,627
+  s_2fc5dac4ded1f9::t_fccac6e1bf2082 807,817-819,826,828-830
+  s_2fc5dac4ded1f9::t_a324d6f7f29791 738-739,741-742,748-749
+benchmark/one-level-arch/test/kernel/mega_moe/src/mega_moe_sim.cpp
+  s_2fc5dac4ded1f9::t_9ede42c66f6c68 151,154
+  s_2fc5dac4ded1f9::t_4f4105de0f9d8c 186,188
+  s_2fc5dac4ded1f9::t_08707147a2131a 82-86
+  s_2fc5dac4ded1f9::t_7f29c9d9fec266 146-150,152-153,155
+  s_2fc5dac4ded1f9::t_68ba333bf3388e 226-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "c1465cd904222fe5e9f75cf3163a494555ca49cd",
+  "prompts": {},
+  "sessions": {
+    "s_2fc5dac4ded1f9": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a8d04e4e103138c69c76a04",
+        "model": "glm-5.3"
+      },
+      "human_author": "Cell-Cell <2601732551@qq.com>",
+      "custom_attributes": {
+        "external_session_id": "6a8d04e4e103138c69c76a04",
+        "tool_type": "builtin",
+        "tool_id": "icube:applyChatSnapshotPatch",
+        "operation_id": "6a8fcf47e103138c69c77559",
+        "client_type": "ide",
+        "dedupe_key": "6a8d04e4e103138c69c76a04:6a8fcf47e103138c69c77559:afterEdit:fa0b8e9c",
+        "runtime_client": "trae-tob-git-ai",
+        "source_scene": "agent",
+        "session_id": "6a8d04e4e103138c69c76a04",
+        "tool_use_id": "6a8fcf47e103138c69c77559",
+        "edit_kind": "file_edit"
+      }
+    }
+  }
+}
