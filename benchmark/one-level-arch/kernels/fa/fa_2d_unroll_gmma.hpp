@@ -111,6 +111,7 @@ void flash_attention_2d_unroll_shared_impl(
     constexpr int kPeTm = kGroupM <= 64 ? 16 : 32;
     constexpr int kQScaleCols = (kStoredQD + 31) / 32;
     constexpr int kTkScaleRows = (kStoredTk + 31) / 32;
+    constexpr int kVectorStateRows = 64; // gfrun/isa not define how to fill 128B m32 with 64B half data
     // SharedTReg is a single 256 KiB pool, rather than a per-operand limit.
     // Match the shared matmul kernels by splitting both CUBE reductions along
     // K when a configured reduction is wider than the legal active operand
@@ -231,13 +232,13 @@ void flash_attention_2d_unroll_shared_impl(
     //   tileMax/tileSum/tileScale: valid shape [kPeTm, 1]
     constexpr int kVectorStateCols = 1;
     using tileMax =
-        Tile<Location::Vec, vector_dtype, kPeTm, kVectorStateCols,
+        Tile<Location::Vec, vector_dtype, kVectorStateRows, kVectorStateCols,
              BLayout::RowMajor,
              kPeTm, 1>;
     using tileSum = tileMax;
     using tileScale = tileMax;
     using tileStateAcc =
-        Tile<Location::Vec, float, kPeTm, kVectorStateCols,
+        Tile<Location::Vec, float, kVectorStateRows, kVectorStateCols,
              BLayout::RowMajor, kPeTm, 1>;
 
     // E8M0 scale tensors used by MXFP8/MXFP4/HiF8/HiF4. Q/K/V scales are

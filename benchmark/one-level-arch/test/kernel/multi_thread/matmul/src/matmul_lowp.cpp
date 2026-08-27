@@ -57,11 +57,11 @@ int main() {
     // FP4 values, matching HiF4_HiF4.cpp's physical-K / 16 convention.
     constexpr int kStoredGK = globK / PACKED_FACTOR;
 
-    dtype src0p[Batch * globM * kStoredGK + 2 * ALIGN];
-    dtype src1p[Batch * kStoredGK * globN + 2 * ALIGN];
-    uint8_t src0Scalep[Batch * globM * (globK / 32) + 2 * ALIGN];
-    uint8_t src1Scalep[Batch * (globK / 32) * globN + 2 * ALIGN];
-    float dstp[Batch * globM * globN + 2 * ALIGN];
+    static dtype src0p[Batch * globM * kStoredGK + 2 * ALIGN];
+    static dtype src1p[Batch * kStoredGK * globN + 2 * ALIGN];
+    static uint8_t src0Scalep[Batch * globM * (globK / 32) + 2 * ALIGN];
+    static uint8_t src1Scalep[Batch * (globK / 32) * globN + 2 * ALIGN];
+    static float dstp[Batch * globM * globN + 2 * ALIGN];
 
     dtype *src0 =
         (dtype *)(((uint64_t)src0p & ALIGN_MASK) + ALIGN);
@@ -77,6 +77,7 @@ int main() {
 #ifdef RES_CHECK
 #define SRC0_PATH CHK_DIR "/src0.bin"
 #define SRC1_PATH CHK_DIR "/src1.bin"
+    static volatile int leader_ready = 0;
     if (tid == kIoTid) {
         readBinaryFile(SRC0_PATH, (uint8_t *)src0,
                        Batch * globM * kStoredGK * sizeof(dtype));
@@ -90,6 +91,12 @@ int main() {
         readBinaryFile(SRC1_SCALE_PATH, src1Scale,
                        Batch * (globK / 32) * globN);
 #endif
+        __asm__ volatile("" : : : "memory");
+        leader_ready = 1;
+    } else {
+        while (!leader_ready) {
+        }
+        __asm__ volatile("" : : : "memory");
     }
 #endif
 

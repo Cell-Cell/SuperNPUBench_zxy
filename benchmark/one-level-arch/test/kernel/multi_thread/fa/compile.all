@@ -16,8 +16,8 @@ for mode in \
     HIF4_VECBF16; do
     make diss TESTCASE=fa_2d_unroll_gmma \
         COMPILER_DIR="$COMPILER_DIR" \
-        FA_MODE="$mode" Sq=256 Skv=256 Tm=64 Tk=64 \
-        X_dim=2 Y_dim=2
+        FA_MODE="$mode" Sq=256 Skv=256 Tm=128 Tk=128 \
+        X_dim=1 Y_dim=2
 done
 
 # Capacity-bound QK/PV configurations. In QK notation, Tm/Tk/QD are M/N/K.

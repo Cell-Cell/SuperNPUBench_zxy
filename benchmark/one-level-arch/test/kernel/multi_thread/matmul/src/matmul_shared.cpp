@@ -94,8 +94,6 @@ int main() {
     if (tid == kIoTid) {
         writeBinaryFile(RES_PATH, (uint8_t *)dst,
                         Batch * globM * globN * sizeof(float));
-    } else {
-        _exit(0);
     }
 #endif
 
