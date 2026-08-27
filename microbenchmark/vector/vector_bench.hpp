@@ -108,16 +108,22 @@ void bench_unary(D *c, D *a, auto op) {
     TSTORE(gC0, tC);
 }
 
-// dst = op(src0, src1, src2)
+// dst = cond ? src0 : src1. PTO v0.58 uses a uint16 condition tile.
 template <typename D, int M, int N>
-void bench_ternary(D *c, D *a, D *b, D *d, auto op) {
-    iter_t<D, M, N> gA(a), gB(b), gD(d), gC(c);
-    auto gA0 = gA(0, 0), gB0 = gB(0, 0), gD0 = gD(0, 0), gC0 = gC(0, 0);
-    tile_t<D, M, N> tA, tB, tD, tC;
+void bench_select(D *c, D *a, D *b, auto op) {
+    using gmMask = global_tensor<uint16_t, RowMajor<M, N>>;
+    using tileMask = Tile<Location::Vec, uint16_t, M, N, BLayout::RowMajor>;
+    using itMask = global_iterator<gmMask, tileMask>;
+    uint16_t cond[M * N];
+    for (int i = 0; i < M * N; ++i) cond[i] = (uint16_t)(i & 1);
+    iter_t<D, M, N> gA(a), gB(b), gC(c); itMask gCond(cond);
+    auto gA0 = gA(0, 0), gB0 = gB(0, 0), gC0 = gC(0, 0);
+    auto gM0 = gCond(0, 0);
+    tile_t<D, M, N> tA, tB, tC; tileMask tCond;
     TLOAD(tA, gA0);
     TLOAD(tB, gB0);
-    TLOAD(tD, gD0);
-    op(tC, tA, tB, tD);
+    TLOAD(tCond, gM0);
+    op(tC, tCond, tA, tB);
     TSTORE(gC0, tC);
 }
 
