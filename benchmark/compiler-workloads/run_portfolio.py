@@ -15,6 +15,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 DEFAULT_COMPILER = Path("/Users/blacktraker/Programming/gitproj/DV4/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin")
+LOCK = json.loads((HERE / "sources.lock.json").read_text())
+DEFAULT_WORKLOADS = (HERE / ".cache" /
+                     f"linx-isa-{LOCK['linx_isa']['commit']}" / "workloads")
 
 
 @dataclass
@@ -79,8 +82,8 @@ def compatible_base_runner(root: Path, out: Path, target: str) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--workloads-root", type=Path, required=True,
-                        help="locked LinxISA workloads directory from fetch_sources.py")
+    parser.add_argument("--workloads-root", type=Path, default=DEFAULT_WORKLOADS,
+                        help=f"locked LinxISA workloads directory (default: {DEFAULT_WORKLOADS})")
     parser.add_argument("--compiler-dir", type=Path, default=DEFAULT_COMPILER)
     parser.add_argument("--target", default="linx64v5-unknown-linux-musl")
     parser.add_argument("--sysroot", type=Path)
@@ -97,7 +100,7 @@ def main() -> int:
     args = parser.parse_args()
     root = args.workloads_root.resolve()
     if not (root / "run_benchmarks.py").is_file():
-        parser.error(f"invalid workloads root: {root}")
+        parser.error(f"workloads not found at {root}; run fetch_sources.py first")
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     clang = args.compiler_dir / "clang"

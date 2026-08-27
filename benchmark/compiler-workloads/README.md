@@ -16,9 +16,11 @@ smoke portfolio with the mandated main compiler checkout:
 
 ```bash
 python3 benchmark/compiler-workloads/run_portfolio.py \
-  --workloads-root benchmark/compiler-workloads/.cache/linx-isa-cbbb23a2d1cedc83573a0ffdd4e3a7b09f17401f/workloads \
   --compile-only
 ```
+
+`run_portfolio.py` defaults to the locked source path produced by
+`fetch_sources.py`. Use `--workloads-root` only to override that location.
 
 Add `--run-command '<runtime> {exe}'` for semantic execution. PolyBench is
 enabled with `--polybench`; TSVC requires both `--tsvc` and `--qemu`. ctuning is
