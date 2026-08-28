@@ -16,11 +16,19 @@ endif
 
 DEFINES += -DkBS=$(BS) -DkH=$(H) -DkHidden=$(HIDDEN)
 
+# SIM_FAKE mode: sigmoid-only fast path (aligned with A5 MEGA_MOE_SIM_FAKE)
+ifeq ($(SIM_FAKE), 1)
+DEFINES += -DMEGA_MOE_SIM_FAKE
+endif
+
 ifeq ($(TESTCASE),mega_moe_sim)
 SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mega_moe_sim.cpp
 TARGET = $(ELF_HEAD)/$(TESTCASE)_BS$(BS)_H$(H)_HD$(HIDDEN).elf
+else ifeq ($(TESTCASE),mega_moe_full_sim)
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mega_moe_full_sim.cpp
+TARGET = $(ELF_HEAD)/$(TESTCASE).elf
 else
-$(error Unsupported TESTCASE=$(TESTCASE); expected mega_moe_sim)
+$(error Unsupported TESTCASE=$(TESTCASE); expected mega_moe_sim or mega_moe_full_sim)
 endif
 
 include ../../common/Makefile.common

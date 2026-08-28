@@ -192,8 +192,12 @@ static void compute_golden(double* yRef, int64* tokRef)
 
 int main()
 {
+#ifdef MEGA_MOE_SIM_FAKE
+    static_assert(kH % 2 == 0, "kH must be even");
+#else
     static_assert(kBS % 16 == 0, "kBS must be divisible by 16 AIV pseudo-cores");
     static_assert(kH % 2 == 0, "kH must be even");
+#endif
     constexpr uint32 kTotalElems = kBS * kH;
 
     float* x = g_mmX;
