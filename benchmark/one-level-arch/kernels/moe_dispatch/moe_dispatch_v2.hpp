@@ -621,13 +621,8 @@ void moe_dispatch_v2(
         if constexpr (QuantMode > UNQUANT) {
             // quantInst_.QuantProcess — compiled out under UNQUANT
         } else {
-            // Fix (A3 compliance): copy token data GM → window with scalar
-            // accesses. The previous TLOAD/TSTORE tile writes to the window
-            // shared 512B blocks with the scalar repack/flag writes below —
-            // a tile access may never share a block with a scalar one
-            // (spec 1.4b:252-258); gfsim reports a3_tile_violation and the
-            // TLSU pipeline deadlocks. All window-slot accesses are scalar
-            // now, so each window block only ever sees scalar traffic.
+            // Scalar copy token data GM → window (A3 compliance: all window
+            // slot accesses are scalar to avoid tile/scalar mixed 512B block access)
             const XInType* src = x + (uint64_t)srcTokenIndex * H;
             XOutType* dst = reinterpret_cast<XOutType*>(wAddr);
             for (uint32_t e = 0; e < H; e++) {
@@ -1132,12 +1127,7 @@ void moe_dispatch_v2(
                 }
             }
 
-            // 1) Read token data from window → expandXOut
-            // Fix (A3 compliance): scalar copy. The previous TLOAD tile reads
-            // from the window shared 512B blocks with the scalar unpack loop
-            // above — a tile access may never share a block with a scalar one
-            // (spec 1.4b:252-258); gfsim reports a3_tile_violation and the
-            // TLSU pipeline deadlocks.
+            // 1) Read token data from window → expandXOut (scalar, A3 compliance)
             {
                 const XOutType* src = reinterpret_cast<const XOutType*>(slotAddr);
                 XOutType* dst = expandXOut + (uint64_t)curDstPosition * H;
