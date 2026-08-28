@@ -1,4 +1,4 @@
-#include "reduction/trowsum_multithread.hpp"
+#include "multi_thread/reduction/trowsum_multithread.hpp"
 
 #include <cstdint>
 

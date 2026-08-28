@@ -1,4 +1,4 @@
-#include "matmul/matmul_shared.hpp"
+#include "multi_thread/matmul/matmul_shared.hpp"
 
 #include <cstdint>
 #include <unistd.h>

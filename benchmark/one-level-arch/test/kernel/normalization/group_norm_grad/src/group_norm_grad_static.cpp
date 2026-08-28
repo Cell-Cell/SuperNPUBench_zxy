@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "normalization/group_norm_grad/group_norm_grad_pto.hpp"
+#include "single_thread/normalization/group_norm_grad/group_norm_grad_pto.hpp"
 
 #ifndef DType
 #define DType __half

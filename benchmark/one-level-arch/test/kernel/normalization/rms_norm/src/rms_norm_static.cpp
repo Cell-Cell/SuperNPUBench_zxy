@@ -3,7 +3,16 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "normalization/rms_norm/rms_norm_pto.hpp"
+
+#ifndef PE_NUM
+#define PE_NUM 1
+#endif
+
+#if PE_NUM == 1
+#include "single_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#else
+#include "multi_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#endif
 
 #ifndef DType
 #define DType __half
@@ -11,10 +20,6 @@
 
 #ifndef EPS
 #define EPS 1e-6f
-#endif
-
-#ifndef PE_NUM
-#define PE_NUM 1
 #endif
 
 // Same as dynamic rms_norm.cpp tiling_info {16,512,2,512}
@@ -53,8 +58,12 @@ int main() {
                    static_cast<size_t>(G_A) * G_R * sizeof(dtype));
 #endif
 
+#if PE_NUM == 1
+    rms_norm<dtype, G_A, G_R, TILE_A, TILE_R>(input, output, EPS);
+#else
     // Full [G_A, G_R] buffers; kernel splits A with get_thread_idx().
     rms_norm<dtype, pe_a, G_A, G_R, TILE_A, TILE_R>(input, output, EPS);
+#endif
 
 #ifdef RES_CHECK
     writeBinaryFile(CHK_DIR "/output.bin", (uint8_t *)output,

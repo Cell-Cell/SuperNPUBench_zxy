@@ -3,7 +3,16 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "normalization/rms_norm/rms_norm_pto.hpp"
+
+#ifndef PE_NUM
+#define PE_NUM 1
+#endif
+
+#if PE_NUM == 1
+#include "single_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#else
+#include "multi_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#endif
 
 #ifndef DType
 #define DType __half
@@ -11,10 +20,6 @@
 
 #ifndef EPS
 #define EPS 1e-6f
-#endif
-
-#ifndef PE_NUM
-#define PE_NUM 1
 #endif
 
 int main() {
@@ -44,10 +49,14 @@ int main() {
                    static_cast<size_t>(g_a) * g_r * sizeof(dtype));
 #endif
 
+#if PE_NUM == 1
+    rms_norm<dtype>(input, tiling_info, output, EPS);
+#else
     const uint32_t tid = get_thread_idx();
     int64_t tiling_pe[4] = {pe_a, g_r, tiling_info[2], tiling_info[3]};
     rms_norm<dtype>(input + tid * pe_a * g_r, tiling_pe,
                     output + tid * pe_a * g_r, EPS);
+#endif
 
 #ifdef RES_CHECK
     writeBinaryFile(CHK_DIR "/output.bin", (uint8_t *)output,
