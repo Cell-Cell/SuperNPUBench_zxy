@@ -23,10 +23,10 @@ void reducesum_trowsum_rand(
     using gm_shapeOut = global_tensor<dtype, RowMajor<gIM, 1>>;
     using tile_shapeData = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor>;
     using tile_shapeData_row = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor, tM, rmd_N>;
-    using tile_shapeSum = Tile<Location::Vec, dtype, tM, 8, BLayout::RowMajor, tM, 1>;
+    using tile_shapeSum = Tile<Location::Vec, dtype, tM, 1, BLayout::RowMajor, tM, 1>;
     using tile_shapeData_col = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor, rmd_M, tN>;
     using tile_shapeData_cor = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor, rmd_M, rmd_N>;
-    using tile_shapeSum_col = Tile<Location::Vec, dtype, tM, 8, BLayout::RowMajor, rmd_M, 1>;
+    using tile_shapeSum_col = Tile<Location::Vec, dtype, tM, 1, BLayout::RowMajor, rmd_M, 1>;
     using tile_shapeTmp = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor>;
     using tile_shapeTmp_row = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor, tM, rmd_N>;
     using tile_shapeTmp_col = Tile<Location::Vec, dtype, tM, tN, BLayout::RowMajor, rmd_M, tN>;
