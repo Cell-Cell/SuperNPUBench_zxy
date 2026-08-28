@@ -1,28 +1,17 @@
-// mega_moe_full_sim.cpp — full GMM1→SwiGLU→GMM2→Combine pipeline using Cube TMATMUL
+// mega_moe_full_sim: full GMM1->SwiGLU->GMM2->Combine pipeline using Cube TMATMUL
 // Self-contained, no mega_moe_sim.hpp (avoid int64 structs triggering v2i64 crash)
 // All uint32_t/float, no int64_t
-//
-// GMM1: x[16,128] @ w1[128,16] = y1[16,16] per expert (TMATMUL Cube)
-// SwiGLU: y2 = silu(y1[:8]) * y1[8:] (Vector tile chain)
-// GMM2: y2[16,8] @ w2[8,16] = y3[16,16] (TMATMUL Cube)
-// Combine: y = weight * y3 (Vector TMULS)
-//
-// Note: actual mega_moe uses H=128, HiddenDim=256.
-// For TMATMUL, tile sizes must be multiples of inner box (16 for float).
-// GMM1: M=16, K=128, N=16 → 1 TMATMUL per (M_tile, N_tile) pair
-//      Need N=256 → 16 N_tiles → 16 TMATMULs (too many for one token)
-// Simplified: M=16, K=128, N=16 (1 tile) for proof of concept.
 
 #include <common/pto_tileop.hpp>
 #include <cstdint>
 
 using namespace pto;
 
-static constexpr uint32_t kBS = 8;
-static constexpr uint32_t kH = 128;
-static constexpr uint32_t kHiddenDim = 256;
-static constexpr uint32_t kExperts = 2;
-static constexpr uint32_t kTileW = 128;
+static constexpr uint32_t kMoeBS = 8;
+static constexpr uint32_t kMoeH = 128;
+static constexpr uint32_t kMoeHiddenDim = 256;
+static constexpr uint32_t kMoeExperts = 2;
+static constexpr uint32_t kMoeTileW = 128;
 
 // Cube tile sizes (must be multiples of 16 for float)
 static constexpr uint32_t tM = 16;
@@ -34,13 +23,13 @@ static constexpr uint32_t tN = 16;
 // But our token vector is [1, 128] — we need M=1 which is not a multiple of 16.
 // Solution: use tM=16 and treat token as first row of a 16-row tile (rest zero).
 
-static float x[kBS * kH] __attribute__((aligned(4096))) = {};
-static float w1[kExperts * kH * kHiddenDim] __attribute__((aligned(4096))) = {};
-static float w2[kExperts * (kHiddenDim / 2) * kH] __attribute__((aligned(4096))) = {};
-static int32_t topkIds[kBS] __attribute__((aligned(4096))) = {};
-static float topkWeights[kBS] __attribute__((aligned(4096))) = {};
-static float y[kBS * kH] __attribute__((aligned(4096))) = {};
-static uint32_t tokOut[kExperts] __attribute__((aligned(4096))) = {};
+static float x[kMoeBS * kMoeH] __attribute__((aligned(4096))) = {};
+static float w1[kMoeExperts * kMoeH * kMoeHiddenDim] __attribute__((aligned(4096))) = {};
+static float w2[kMoeExperts * (kMoeHiddenDim / 2) * kMoeH] __attribute__((aligned(4096))) = {};
+static int32_t topkIds[kMoeBS] __attribute__((aligned(4096))) = {};
+static float topkWeights[kMoeBS] __attribute__((aligned(4096))) = {};
+static float y[kMoeBS * kMoeH] __attribute__((aligned(4096))) = {};
+static uint32_t tokOut[kMoeExperts] __attribute__((aligned(4096))) = {};
 
 // Intermediate buffers (padded to tile multiples)
 static float y1Buf[tM * tN] __attribute__((aligned(4096))) = {};  // [16,16] GMM1 output tile
@@ -54,8 +43,8 @@ static float y3Padded[tM * tN] __attribute__((aligned(4096))) = {};  // GMM2 out
 
 int main() {
     // Minimal scalar init
-    for (uint32_t i = 0; i < kBS * kH; i++) x[i] = 0.01f * (float)i;
-    for (uint32_t i = 0; i < kBS; i++) { topkIds[i] = i % kExperts; topkWeights[i] = 1.0f; }
+    for (uint32_t i = 0; i < kMoeBS * kMoeH; i++) x[i] = 0.01f * (float)i;
+    for (uint32_t i = 0; i < kMoeBS; i++) { topkIds[i] = i % kMoeExperts; topkWeights[i] = 1.0f; }
     w1[0] = 0.01f; w2[0] = 0.01f;
 
     // Cube tile types
@@ -67,20 +56,20 @@ int main() {
     using TileC = Tile<Location::Vec, float, tM, tN, BLayout::RowMajor>;
 
     // Vector tile types (for SwiGLU and Combine)
-    using gmV = global_tensor<float, RowMajor<1, kTileW>>;
-    using tileV = Tile<Location::Vec, float, 1, kTileW, BLayout::RowMajor>;
+    using gmV = global_tensor<float, RowMajor<1, kMoeTileW>>;
+    using tileV = Tile<Location::Vec, float, 1, kMoeTileW, BLayout::RowMajor>;
 
-    for (uint32_t token = 0; token < kBS; token++) {
+    for (uint32_t token = 0; token < kMoeBS; token++) {
         const uint32_t expert = (uint32_t)topkIds[token];
         const float weight = topkWeights[token];
 
         // --- Prepare padded x: copy token row into xPadded[0, :] ---
-        for (uint32_t j = 0; j < kH; j++) xPadded[j] = x[token * kH + j];
+        for (uint32_t j = 0; j < kMoeH; j++) xPadded[j] = x[token * kMoeH + j];
 
         // ====== GMM1: xPadded[16,128] @ w1_tile[128,16] = y1Padded[16,16] ======
         {
             gmL gA(xPadded);
-            gmR gB(w1 + expert * kH * kHiddenDim);  // w1[expert][0:128][0:16]
+            gmR gB(w1 + expert * kMoeH * kMoeHiddenDim);  // w1[expert][0:128][0:16]
             gmC gC(y1Padded);
 
             TileL tA;
@@ -125,7 +114,7 @@ int main() {
         // w2[expert] is [128][128], w2[expert][0:128][0:16] → stride = 128
         {
             gmL gA(y2Padded);
-            gmR gB(w2 + expert * (kHiddenDim / 2) * kH);
+            gmR gB(w2 + expert * (kMoeHiddenDim / 2) * kMoeH);
             gmC gC(y3Padded);
 
             TileL tA;
@@ -145,13 +134,13 @@ int main() {
             gmV gY3(y3Padded);
             TLOAD(y3, gY3);
             TMULS(y3, y3, weight);
-            gmV gY(y + token * kH);
+            gmV gY(y + token * kMoeH);
             TSTORE(gY, y3);
         }
     }
 
-    tokOut[0] = kBS / 2;
-    tokOut[1] = kBS - kBS / 2;
+    tokOut[0] = kMoeBS / 2;
+    tokOut[1] = kMoeBS - kMoeBS / 2;
 
     return 0;
 }

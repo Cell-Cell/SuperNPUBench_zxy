@@ -1,62 +1,38 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "moe_combine/moe_combine_v2.hpp"
-
+#include "deepseek/moe/moe_combine_v2.hpp"
+using namespace pto;
 using namespace supernpu::tile_isa;
 
-constexpr int kBS = 8;
-constexpr int kH = 128;
-constexpr int kK = 4;
-constexpr int kMoeExpertNum = 4;
-constexpr int kSharedExpertNum = 0;
-constexpr int kTileW = 64;
+using dtype = __bf16;
 
-constexpr int kSlotCount = kK + kSharedExpertNum;
-constexpr int kHBytes = kH * sizeof(__half);
-constexpr int kBlockCntPerToken = (kHBytes + 479) / 480;
-constexpr int kAlignWinSize = kBlockCntPerToken * 512;
-constexpr uint64_t kTotalWinSize = static_cast<uint64_t>(kBS) * kSlotCount * kAlignWinSize;
-constexpr int kMoeSendNum = 1 * kMoeExpertNum;
-constexpr uint64_t kStatusSize = 820UL * 1024UL;
-constexpr uint64_t kWorkspaceSize = 10UL * 1024UL;
+constexpr int BS = 8;
+constexpr int H = 128;
+constexpr int K = 4;
+constexpr int NUM_EXPANDED = BS * K;
+constexpr int TILE_W = 128;
 
-static __half expandX[kBS * kK * kH] __attribute__((aligned(4096)));
-static float expertScales[kBS * kK] __attribute__((aligned(4096)));
-static int32_t expertIds[kBS * kK] __attribute__((aligned(4096)));
-static int32_t expandIdx[kBS * kK * 3] __attribute__((aligned(4096)));
-static uint32_t epSendCount[kMoeSendNum] __attribute__((aligned(4096)));
-static __half output[kBS * kH] __attribute__((aligned(4096)));
-static uint8_t windowBuf[kTotalWinSize] __attribute__((aligned(4096)));
-static uint8_t statusBuf[kStatusSize] __attribute__((aligned(4096)));
-static uint8_t workspace[kWorkspaceSize] __attribute__((aligned(4096)));
+static __bf16 expand_x[NUM_EXPANDED * H] __attribute__((aligned(4096))) = {};
+static float expert_scales[NUM_EXPANDED * TILE_W] __attribute__((aligned(4096))) = {};
+static std::int32_t expand_idx[NUM_EXPANDED * 3] __attribute__((aligned(4096))) = {};
+static __bf16 window_data[NUM_EXPANDED * H] __attribute__((aligned(4096))) = {};
+static float window_flag[NUM_EXPANDED * TILE_W] __attribute__((aligned(4096))) = {};
+static std::int32_t window_triple[NUM_EXPANDED * 3] __attribute__((aligned(4096))) = {};
+static uint32_t window_state[16] __attribute__((aligned(4096))) = {};
+static float pred_buf[NUM_EXPANDED * TILE_W] __attribute__((aligned(4096))) = {};
+static __bf16 out_buf[BS * H] __attribute__((aligned(4096))) = {};
 
 int main() {
-    epSendCount[0] = 0; epSendCount[1] = 0; epSendCount[2] = 0; epSendCount[3] = kBS * kK;
-    for (int i = 0; i < kBS * kK; i++) {
-        expertIds[i] = i % kMoeExpertNum;
-        expertScales[i] = 0.25f;
-        expandIdx[i * 3] = 0;
-        expandIdx[i * 3 + 1] = i / kK;
-        expandIdx[i * 3 + 2] = i % kK;
+    for (int tk = 0; tk < NUM_EXPANDED; tk++) {
+        expand_idx[tk * 3 + 0] = 0;
+        expand_idx[tk * 3 + 1] = tk / K;
+        expand_idx[tk * 3 + 2] = tk % K;
+        for (int j = 0; j < K; j++)
+            expert_scales[tk * TILE_W + j] = 0.25f;
     }
-    for (int i = 0; i < kBS * kK * kH; i++) {
-        expandX[i] = static_cast<__half>(static_cast<float>(i % 100) * 0.01f);
-    }
-    moe_combine_v2<__half, __half, int32_t, kBS, kH, kK, kSharedExpertNum, kMoeExpertNum,
-                   1, 0, kTileW>(
-        expandX, expertScales, expertIds, expandIdx, epSendCount,
-        output, windowBuf, statusBuf, workspace);
 
-    static __half refOutput[kBS * kH];
-    refCombine(expandX, expertScales, expertIds, refOutput, kBS, kH, kK, kMoeExpertNum);
-
-    int ret = 0;
-    for (int i = 0; i < kBS * kH; i++) {
-        float a = static_cast<float>(output[i]);
-        float b = static_cast<float>(refOutput[i]);
-        float diff = a - b;
-        if (diff < 0.0f) diff = -diff;
-        if (diff > 0.01f) { ret = 1; break; }
-    }
-    return ret;
+    moe_combine_v2<__bf16, __bf16, BS, H, K, NUM_EXPANDED, TILE_W>(
+        expand_x, expert_scales, expand_idx, window_data, window_flag,
+        window_state, pred_buf, out_buf);
+    return 0;
 }

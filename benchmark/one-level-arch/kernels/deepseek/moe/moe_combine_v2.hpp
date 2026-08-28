@@ -1,5 +1,5 @@
-#ifndef SUPERNPU_MOE_COMBINE_FULL_PTO_HPP
-#define SUPERNPU_MOE_COMBINE_FULL_PTO_HPP
+#ifndef SUPERNPU_MOE_COMBINE_V2_HPP
+#define SUPERNPU_MOE_COMBINE_V2_HPP
 #include <common/pto_tileop.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -141,7 +141,7 @@ void combine_phase(float *expertScales, DTypeIn *windowData, float *windowFlag,
 
 template <typename DTypeIn, typename DTypeOut, int BS, int H, int K,
           int NumExpanded, int TileW = 128>
-void moe_combine_full(DTypeIn *expandX, float *expertScales,
+void moe_combine_v2(DTypeIn *expandX, float *expertScales,
                       std::int32_t *expandIdx,
                       DTypeIn *windowData, float *windowFlag,
                       uint32_t *windowState, float *predBuf,
