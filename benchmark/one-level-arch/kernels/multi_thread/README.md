@@ -18,11 +18,19 @@ Current implementations:
 | Shared Matmul | `matmul/matmul_shared.hpp` |
 | Shared-B-reuse Matmul | `matmul/matmul_shared_reuseB.hpp` |
 | Low-precision Matmul | `matmul/matmul_shared_lowp.hpp` |
-| RMSNorm | `normalization/rms_norm/rms_norm_pto.hpp` |
+| RMSNorm | `normalization/rms_norm/rms_norm.hpp` |
 | TROWSUM | `reduction/trowsum_multithread.hpp` |
 
-Includes use the execution-model prefix, for example:
+## Run with gfrun
 
-```cpp
-#include "multi_thread/matmul/matmul_shared.hpp"
+Run an ELF built from a multi-thread operator test with four simulated PEs:
+
+```bash
+gfrun -t 1 -s softcore.multiThreadNum=4 -f /path/to/operator.elf
 ```
+
+Do not omit `softcore.multiThreadNum=4`: cooperative kernels require all four
+PEs, while SPMD kernels use thread IDs 0 through 3 to partition the work.
+
+The run passes when `gfrun` exits with status 0 and its output contains both
+`Reach the End of Benchmark` and `R2 = 0`.

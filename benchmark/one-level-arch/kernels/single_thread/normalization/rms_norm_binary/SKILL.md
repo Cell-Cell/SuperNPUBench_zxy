@@ -3,7 +3,7 @@ name: rms-norm-binary
 description: >-
   Build, run, and debug the one-level rms_norm_binary kernel (R-split RMSNorm)
   with SuperNPUBench + run_op.py + gfrun/gfsim precision checks. Use when
-  editing rms_norm_binary_pto.hpp, rms_norm_binary tests, workspace/GetCacheId
+  editing rms_norm_binary.hpp, rms_norm_binary tests, workspace/GetCacheId
   reduce, TADD cross-tile sum, or verifying [1,8192] fp16 binary RMSNorm.
   Shape dims are A (outer) and R (reduce): g_a/g_r, tile_a/tile_r, tA/tR.
 ---
@@ -39,8 +39,8 @@ Current default test shape: **`[1, 8192]`**, `tile_r=1024` → **`Rb=8`**, fp16.
 
 | Role | Path |
 |------|------|
-| Kernel | `$ROOT/SuperNPUBench/benchmark/one-level-arch/kernels/single_thread/normalization/rms_norm_binary/rms_norm_binary_pto.hpp` |
-| Reference (single-tile) | `.../kernels/single_thread/normalization/rms_norm/rms_norm_pto.hpp` |
+| Kernel | `$ROOT/SuperNPUBench/benchmark/one-level-arch/kernels/single_thread/normalization/rms_norm_binary/rms_norm_binary.hpp` |
+| Reference (single-tile) | `.../kernels/single_thread/normalization/rms_norm/rms_norm.hpp` |
 | Testcase | `.../test/kernel/normalization/rms_norm_binary/` |
 | Host entry | `.../rms_norm_binary/src/rms_norm_binary.cpp` |
 | Gen golden | `.../rms_norm_binary/src/gen_rms_norm_binary_data.py` |
@@ -66,8 +66,8 @@ Compare dir (precision):
 
 ## Kernel pipeline (current)
 
-File: `rms_norm_binary_pto.hpp`. **No `rms_norm_dyn_ops.hpp`.** TEPL style like
-`rms_norm_pto.hpp`.
+File: `rms_norm_binary.hpp`. **No `rms_norm_dyn_ops.hpp`.** TEPL style like
+`rms_norm.hpp`.
 
 ```text
 Pass1:

@@ -9,9 +9,9 @@
 #endif
 
 #if PE_NUM == 1
-#include "single_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#include "single_thread/normalization/rms_norm/rms_norm.hpp"
 #else
-#include "multi_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#include "multi_thread/normalization/rms_norm/rms_norm.hpp"
 #endif
 
 #ifndef DType

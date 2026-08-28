@@ -1,6 +1,6 @@
 #pragma once
 
-#include "single_thread/normalization/rms_norm/rms_norm_pto.hpp"
+#include "single_thread/normalization/rms_norm/rms_norm.hpp"
 
 // Compile-time four-PE RMSNorm. The A dimension is divided equally across
 // PEs; each PE processes one contiguous row range and writes its own output.
