@@ -10,6 +10,7 @@ tM ?= 32
 tN ?= 32
 tK ?= 32
 GOLDEN_ARGS ?= --ones
+group_runtime := on
 
 # Element data type for the A/B input tiles. The output C tile is always FP32
 # (see matmul_shared.hpp: gmC/tileC use float). Supported: float, __bf16, __half.
