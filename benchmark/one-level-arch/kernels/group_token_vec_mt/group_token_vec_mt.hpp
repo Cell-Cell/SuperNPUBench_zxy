@@ -90,11 +90,14 @@ static inline void calTokenPerExpertCnt_mt_tile(
     using TilePerPE = Tile<Location::Vec, uint32_t, 4, kTileN, BLayout::RowMajor>;
     using GmPerPE = global_tensor<uint32_t, RowMajor<kBS, kTopK>>;
     using itPerPE = global_iterator<GmPerPE, TilePerPE>;
-    itPerPE gIter(topkIndex + tid * 4 * kTopK);   // rows [4*tid, 4*tid+3]
+    itPerPE gIter(topkIndex);   // full tensor; PE tid prefetches its own slice
 
     TilePerPE dataTile;
     for (uint32_t blk = 0; blk < kBS / kTileM; ++blk) {
-        auto src = gIter(blk, 0);
+        // rows [16*blk + 4*tid, +4): row-tile index 4*blk + tid on the full
+        // tensor. (A base pointer offset of tid*4 rows would only reach
+        // tokens [4*tid, 4*tid + 128) across the 32 blocks.)
+        auto src = gIter(4 * blk + tid, 0);
         TLOAD(dataTile, src);   // DMA in this PE's 4 rows
 
         // scalar histogram over the same (disjoint) rows, reading GM
@@ -247,15 +250,20 @@ static inline void sortKernel_mt_tile(
     using itPerPE = global_iterator<GmPerPE, TilePerPE>;
     using itMin = global_iterator<GmMin, TileMinPE>;
 
-    itPerPE gIter(topkIndex + tid * 4 * kTopK);   // rows [4*tid, 4*tid+3]
-    itMin oIter(minLocalExpIds + tid * 4);        // same 4 rows of output
+    // Full-tensor iterators; PE tid addresses its 4-row slice [16*blk + 4*tid,
+    // +4) via row-tile index 4*blk + tid. (The previous base-pointer offset
+    // tid*4 combined with per-block stride 4 only covered tokens [0, 140);
+    // tokens 140..511 were never written and stayed zero — root cause of the
+    // R2=4 section-bounds verification failure.)
+    itPerPE gIter(topkIndex);
+    itMin oIter(minLocalExpIds);
 
     TilePerPE tIn;
     TilePerPE tRem;
     TileMinPE tMin;
     for (uint32_t blk = 0; blk < kBS / kTileM; ++blk) {
-        auto src = gIter(blk, 0);
-        auto dst = oIter(blk, 0);
+        auto src = gIter(4 * blk + tid, 0);
+        auto dst = oIter(4 * blk + tid, 0);
         TLOAD(tIn, src);
         TREMS(tRem, tIn, expertPerRank);   // local expert ids
         TROWMIN(tMin, tRem);               // per-token min
