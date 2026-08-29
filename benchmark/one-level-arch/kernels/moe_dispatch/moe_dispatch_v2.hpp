@@ -44,8 +44,12 @@ void dispatch_pack(DType* x, int32_t* expertIds, int32_t* windowTriple,
             TLOAD(xq, gx);
 
             // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
+            // TSUB(dst, src, src) is a compile-time stand-in for TMOV(dst, src):
+            // the 0828 toolchain's asm matcher rejects TMOV's 0.58.4 B.DATR
+            // syntax ("NORM, DTYPE_NONE, Zero"); TSUB emits no B.DATR and keeps
+            // the same src->dst dependency edge (dst = src - src = 0).
             tile_d sync_d;
-            TMOV(sync_d, xq);
+            TSUB(sync_d, xq, xq);
 
             // #9 512B stride write: data at [tk*WindowStride + t*TileW]
             auto gw = w_iter(tk, t);
@@ -57,8 +61,9 @@ void dispatch_pack(DType* x, int32_t* expertIds, int32_t* windowTriple,
         TEXPANDS(flagTile, 1.0f);
 
         // #3 Pipeline sync (SyncFunc<V_MTE3> aligned)
+        // TSUB as TMOV stand-in (see dispatch_pack note).
         tile_f sync_f;
-        TMOV(sync_f, flagTile);
+        TSUB(sync_f, flagTile, flagTile);
 
         auto gf = flag_iter(tk, 0);
         TSTORE(gf, flagTile);
@@ -70,7 +75,11 @@ void dispatch_pack(DType* x, int32_t* expertIds, int32_t* windowTriple,
     }
 }
 
-// ====== #4 Flag check (structurally aligned, scalar readback skipped) ======
+// ====== #4 Flag check (tile pass-through; TCMP's 0.58.4 B.DATR syntax is
+// rejected by the 0828 toolchain asm matcher, so the EQ predicate collapses
+// to a flag->predBuf copy. predBuf is never read back — the load/store pair
+// keeps the original windowFlag read side-effect and structural alignment.
+// TSUB stands in for the removed TMOV sync, see dispatch_pack note) ======
 template <int BS, int K, int TileW>
 void check_flag(float* windowFlag, float* predBuf, int srcSlot)
 {
@@ -85,29 +94,22 @@ void check_flag(float* windowFlag, float* predBuf, int srcSlot)
     it_flag flag_iter(windowFlag);
     it_pred pred_iter(predBuf);
 
-    tile_f refFlag;
-    TEXPANDS(refFlag, 1.0f);
-
     tile_f flagTile;
     auto gf = flag_iter(srcSlot, 0);
     TLOAD(flagTile, gf);
 
     // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
     tile_f sync_f1;
-    TMOV(sync_f1, flagTile);
-
-    tile_f predTile;
-    TCMP<CmpMode::EQ>(predTile, flagTile, refFlag);
-
-    // #3 Pipeline sync (SyncFunc<V_MTE3> aligned)
-    tile_f sync_f2;
-    TMOV(sync_f2, predTile);
+    TSUB(sync_f1, flagTile, flagTile);
 
     auto gp = pred_iter(srcSlot, 0);
-    TSTORE(gp, predTile);
+    TSTORE(gp, flagTile);
 }
 
-// ====== #7 CUMSUM flag check (structurally aligned) ======
+// ====== #7 CUMSUM flag check (tile pass-through; TCMP unavailable on the
+// 0828 toolchain — see check_flag note. Reads the same TileW-float range at
+// windowState+4 that the original tile version read, copies it to predBuf.
+// TSUB stands in for the removed TMOV sync) ======
 template <int TileW>
 void check_cumsum_flag(uint32_t* windowState, float* predBuf)
 {
@@ -115,29 +117,20 @@ void check_cumsum_flag(uint32_t* windowState, float* predBuf)
     using gm_st  = global_tensor<float, RowMajor<1, TileW>>;
     using gm_pred = global_tensor<float, RowMajor<1, TileW>>;
     using tile_f = Tile<Location::Vec, float, 1, TileW, BLayout::RowMajor>;
-    using it_st  = global_iterator<gm_st,  tile_f>;
     using it_pred = global_iterator<gm_pred, tile_f>;
 
     auto gs = reinterpret_cast<gm_st*>(windowState + 4);
     it_pred pred_iter(predBuf);
 
-    tile_f refFlag;
-    TEXPANDS(refFlag, 1.0f);
-
     tile_f readFlag;
     TLOAD(readFlag, *gs);
 
+    // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
     tile_f sync_f1;
-    TMOV(sync_f1, readFlag);
-
-    tile_f predFlag;
-    TCMP<CmpMode::EQ>(predFlag, readFlag, refFlag);
-
-    tile_f sync_f2;
-    TMOV(sync_f2, predFlag);
+    TSUB(sync_f1, readFlag, readFlag);
 
     auto gp = pred_iter(0, 0);
-    TSTORE(gp, predFlag);
+    TSTORE(gp, readFlag);
 }
 
 // ====== #1 Clear flag ======
@@ -154,8 +147,9 @@ void clear_flag(float* windowFlag, int srcSlot)
     tile_f zeroFlag;
     TEXPANDS(zeroFlag, 0.0f);
 
+    // TSUB as TMOV stand-in (see dispatch_pack note).
     tile_f sync_zf;
-    TMOV(sync_zf, zeroFlag);
+    TSUB(sync_zf, zeroFlag, zeroFlag);
 
     auto gf = flag_iter(srcSlot, 0);
     TSTORE(gf, zeroFlag);
@@ -184,8 +178,9 @@ void dispatch_copy_out(DType* windowData, DType* expandXOut,
         TLOAD(xq, gw);
 
         // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
+        // TSUB as TMOV stand-in (see dispatch_pack note).
         tile_d sync_d;
-        TMOV(sync_d, xq);
+        TSUB(sync_d, xq, xq);
 
         auto gout = out_iter(dstPos, t);
         TSTORE(gout, xq);
@@ -236,15 +231,16 @@ void moe_dispatch_v2(
         tile_f cumsumFlag;
         TEXPANDS(cumsumFlag, 1.0f);
 
+        // TSUB as TMOV stand-in (see dispatch_pack note).
         tile_f sync_cf;
-        TMOV(sync_cf, cumsumFlag);
+        TSUB(sync_cf, cumsumFlag, cumsumFlag);
 
         using gm_st = global_tensor<float, RowMajor<1, TileW>>;
         auto gs = reinterpret_cast<gm_st*>(windowState + 4);
         TSTORE(*gs, cumsumFlag);
     }
 
-    // #7 CUMSUM flag check (structurally aligned: TLOAD + TCMP + TSTORE)
+    // #7 CUMSUM flag check (tile pass-through; TCMP unavailable on 0828)
     check_cumsum_flag<TileW>(windowState, predBuf);
 
     // ====== Phase 3: LocalWindowCopy (read window → continuous output) ======
@@ -260,7 +256,7 @@ void moe_dispatch_v2(
             }
             if (srcSlot < 0) continue;
 
-            // #4 Flag check (structurally aligned: TEXPANDS + TLOAD + TCMP + TSTORE)
+            // #4 Flag check (tile pass-through; TCMP unavailable on 0828)
             // Scalar readback skipped — self-loopback data always ready
             check_flag<BS, K, TileW>(windowFlag, predBuf, srcSlot);
 

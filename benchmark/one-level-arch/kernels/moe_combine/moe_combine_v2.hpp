@@ -43,8 +43,12 @@ void combine_pack(DType* expandX, int32_t* expandIdx,
             TLOAD(xq, gx);
 
             // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
+            // TSUB(dst, src, src) is a compile-time stand-in for TMOV(dst, src):
+            // the 0828 toolchain's asm matcher rejects TMOV's 0.58.4 B.DATR
+            // syntax ("NORM, DTYPE_NONE, Zero"); TSUB emits no B.DATR and keeps
+            // the same src->dst dependency edge (dst = src - src = 0).
             tile_d sync_d;
-            TMOV(sync_d, xq);
+            TSUB(sync_d, xq, xq);
 
             auto gw = win_iter(slot, t);
             TSTORE(gw, xq);
@@ -59,7 +63,11 @@ void combine_pack(DType* expandX, int32_t* expandIdx,
     }
 }
 
-// ====== #4 Flag check (structurally aligned) ======
+// ====== #4 Flag check (tile pass-through; TCMP's 0.58.4 B.DATR syntax is
+// rejected by the 0828 toolchain asm matcher, so the EQ predicate collapses
+// to a flag->predBuf copy. predBuf consumers treat non-1.0f as "not ready";
+// the flag is 1.0f after pack, so pass-through preserves the wait semantics.
+// TSUB stands in for the removed TMOV sync, see combine_pack note) ======
 template <int NumExpanded, int TileW>
 void check_flag(float* windowFlag, float* predBuf, int slot, int t)
 {
@@ -73,26 +81,16 @@ void check_flag(float* windowFlag, float* predBuf, int slot, int t)
     it_flag flag_iter(windowFlag);
     it_pred pred_iter(predBuf);
 
-    tile_f refFlag;
-    TEXPANDS(refFlag, 1.0f);
-
     tile_f flagTile;
     auto gf = flag_iter(slot, t);
     TLOAD(flagTile, gf);
 
     // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
     tile_f sync_f1;
-    TMOV(sync_f1, flagTile);
-
-    tile_f predTile;
-    TCMP<CmpMode::EQ>(predTile, flagTile, refFlag);
-
-    // #3 Pipeline sync (SyncFunc<V_MTE3> aligned)
-    tile_f sync_f2;
-    TMOV(sync_f2, predTile);
+    TSUB(sync_f1, flagTile, flagTile);
 
     auto gp = pred_iter(slot, t);
-    TSTORE(gp, predTile);
+    TSTORE(gp, flagTile);
 }
 
 // ====== #1 Clear flag ======
@@ -108,8 +106,9 @@ void clear_flag(float* windowFlag, int slot)
     tile_f zeroFlag;
     TEXPANDS(zeroFlag, 0.0f);
 
+    // TSUB as TMOV stand-in (see combine_pack note).
     tile_f sync_zf;
-    TMOV(sync_zf, zeroFlag);
+    TSUB(sync_zf, zeroFlag, zeroFlag);
 
     auto gf = flag_iter(slot, 0);
     TSTORE(gf, zeroFlag);
@@ -137,7 +136,7 @@ void combine_reduce(float* expertScales, DTypeIn* windowData, float* windowFlag,
 
     for (int n = 0; n < BS; n++) {
         for (int t = 0; t < kTiles; t++) {
-            // #4 Flag check (structurally aligned: TEXPANDS + TLOAD + TCMP + TSTORE)
+            // #4 Flag check (tile pass-through; TCMP unavailable on 0828)
             // Scalar readback skipped — self-loopback data always ready
             for (int k = 0; k < K; k++) {
                 check_flag<NumExpanded, TileW>(windowFlag, predBuf, n * K + k, t);
@@ -161,8 +160,9 @@ void combine_reduce(float* expertScales, DTypeIn* windowData, float* windowFlag,
                 TLOAD(xq, gw);
 
                 // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
+                // TSUB as TMOV stand-in (see combine_pack note).
                 tile_d sync_d;
-                TMOV(sync_d, xq);
+                TSUB(sync_d, xq, xq);
 
                 tile_f xf;
                 TCVT(xf, xq);
