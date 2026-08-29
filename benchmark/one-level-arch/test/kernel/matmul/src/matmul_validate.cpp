@@ -14,7 +14,7 @@
 // is bit-exact. Tile-aligned default sizes (multiples of tilM/tilN/tilK) are
 // used so no partial-tile masking reasoning is needed.
 //
-// Build: make TYPE=MATMUL_VALIDATE M=.. N=.. K=.. tM=.. tN=.. tK=.. COMPILER_DIR=<latest> [diss]
+// Build: make TYPE=MATMUL_VALIDATE M=.. N=.. K=.. tM=.. tN=.. tK=.. COMPILER_DIR=<toolchain> [diss]
 
 #include <common/pto_tileop.hpp>
 #include <cstring>
@@ -50,7 +50,7 @@
 #define Batch 1
 #endif
 
-#include "matmul/matmul.hpp"
+#include "single_thread/matmul/matmul.hpp"
 
 // dst is a file-scope global so its address is fixed in .bss; this lets the
 // result be dumped verbatim via `gfrun --dump-memory` for printf-independent,
@@ -70,8 +70,7 @@ int main() {
   for (int i = 0; i < globM * globN; ++i) dst[i] = 0.0f;
 
   // C = A * B  (mask matmul, any-shape tiled MAC).
-  matmul_mask_tileop<float, globM, globN, globK, tilM, tilN, tilK>(dst, src0,
-                                                                   src1);
+  matmul_mask<float, globM, globN, globK, tilM, tilN, tilK>(dst, src0, src1);
 
   // Golden: C[i][j] = globK for every (i,j).
   const float golden = (float)globK;
