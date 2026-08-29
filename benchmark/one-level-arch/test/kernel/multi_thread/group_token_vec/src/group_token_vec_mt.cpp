@@ -78,11 +78,15 @@ static void refSortByLocalExpId(const uint32_t *topkIndex,
 
 int main()
 {
+    const uint32_t tid = get_thread_idx();
+
 #ifndef __linx
-    printf("=== Multi-Thread Group Token Vec Test (4-PE, Tile) ===\n");
-    printf("BS=%u  TopK=%u  ExpertPerRank=%u  ExpertNum=%u  ThreadsPerBlock=%u\n",
-           kBS, kTopK, kExpertPerRank, kExpertNum, kThreadsPerBlock);
-    fflush(stdout);
+    if (tid == 0) {
+        printf("=== Multi-Thread Group Token Vec Test (4-PE, Tile) ===\n");
+        printf("BS=%u  TopK=%u  ExpertPerRank=%u  ExpertNum=%u  ThreadsPerBlock=%u\n",
+               kBS, kTopK, kExpertPerRank, kExpertNum, kThreadsPerBlock);
+        fflush(stdout);
+    }
 #endif
 
     static uint32_t topkIndex[kTopKEleNum + 2 * 4096];
@@ -104,13 +108,6 @@ int main()
 
     genTopkIndex(topkIndexAligned, kBS, kTopK, kExpertNum);
 
-    for (uint32_t i = 0; i < kExpertNum; i++) tokenPerExpertCnt[i] = 0;
-    for (uint32_t i = 0; i < kExpertPerRank * kBS; i++) groupedTokenIds[i] = 0;
-    for (uint32_t i = 0; i < kExpertPerRank * kBS * kSuperPodNum; i++) tokenSuperPodInfo[i] = 0;
-    for (uint32_t i = 0; i < kExpertPerRank; i++) expertSectionTokenCnt[i] = 0;
-    for (uint32_t i = 0; i < kBS; i++) sortedTokenIds[i] = 0;
-    for (uint32_t i = 0; i < kExpertPerRank * kThreadsPerBlock; i++) perPeSectionCnt[i] = 0;
-
     BENCHSTART;
 
     runGroupTokenVecMT(topkIndexAligned, tokenPerExpertCnt,
@@ -121,77 +118,83 @@ int main()
 
     BENCHEND;
 
-    static uint32_t refExpertCnt[kExpertNum];
-    static uint32_t refGroupedIds[kExpertPerRank * kBS];
-    static uint32_t refSectionCnt[kExpertPerRank];
-    static uint32_t refSortedIds[kBS];
-    static uint32_t refSectionStarts[kExpertPerRank + 1];
+    // --- verification & reference: PE0 only (after final barrier inside
+    // runGroupTokenVecMT, all outputs are fully written and visible) ---
+    int ret = 0;
+    if (tid == 0) {
+        static uint32_t refExpertCnt[kExpertNum];
+        static uint32_t refGroupedIds[kExpertPerRank * kBS];
+        static uint32_t refSectionCnt[kExpertPerRank];
+        static uint32_t refSortedIds[kBS];
+        static uint32_t refSectionStarts[kExpertPerRank + 1];
+        // PE0-private verification scratch
+        static uint32_t verBuf[kBS];
+        static uint32_t verRef[kBS];
 
-    for (uint32_t i = 0; i < kExpertPerRank * kBS; i++) refGroupedIds[i] = 0;
-    refCalTokenPerExpertCnt(topkIndexAligned, refExpertCnt, kExpertNum, kTopKEleNum);
-    refGroupToken(topkIndexAligned, refGroupedIds, refSectionCnt,
-                   kBS, kTopK, kExpertPerRank);
-    refSortByLocalExpId(topkIndexAligned, refSortedIds, refSectionStarts,
-                         kBS, kTopK, kExpertPerRank);
+        for (uint32_t i = 0; i < kExpertPerRank * kBS; i++) refGroupedIds[i] = 0;
+        refCalTokenPerExpertCnt(topkIndexAligned, refExpertCnt, kExpertNum, kTopKEleNum);
+        refGroupToken(topkIndexAligned, refGroupedIds, refSectionCnt,
+                      kBS, kTopK, kExpertPerRank);
+        refSortByLocalExpId(topkIndexAligned, refSortedIds, refSectionStarts,
+                             kBS, kTopK, kExpertPerRank);
 
-    int cntMatch = 0;
-    for (uint32_t i = 0; i < kExpertNum; i++) {
-        if (tokenPerExpertCnt[i] == refExpertCnt[i]) cntMatch++;
-    }
-
-    int secMatch = 0;
-    for (uint32_t i = 0; i < kExpertPerRank; i++) {
-        if (expertSectionTokenCnt[i] == refSectionCnt[i]) secMatch++;
-    }
-
-    int idMatch = 0;
-    int idTotal = 0;
-    for (uint32_t s = 0; s < kExpertPerRank; s++) {
-        uint32_t n = expertSectionTokenCnt[s];
-        idTotal += n;
-        static uint32_t buf[kBS];
-        static uint32_t ref[kBS];
-        for (uint32_t i = 0; i < n; i++) {
-            buf[i] = groupedTokenIds[s * kBS + i];
-            ref[i] = refGroupedIds[s * kBS + i];
+        int cntMatch = 0;
+        for (uint32_t i = 0; i < kExpertNum; i++) {
+            if (tokenPerExpertCnt[i] == refExpertCnt[i]) cntMatch++;
         }
-        for (uint32_t i = 0; i < n; i++) {
-            for (uint32_t j = i + 1; j < n; j++) {
-                if (buf[i] > buf[j]) { uint32_t t = buf[i]; buf[i] = buf[j]; buf[j] = t; }
-                if (ref[i] > ref[j]) { uint32_t t = ref[i]; ref[i] = ref[j]; ref[j] = t; }
+
+        int secMatch = 0;
+        for (uint32_t i = 0; i < kExpertPerRank; i++) {
+            if (expertSectionTokenCnt[i] == refSectionCnt[i]) secMatch++;
+        }
+
+        int idMatch = 0;
+        int idTotal = 0;
+        for (uint32_t s = 0; s < kExpertPerRank; s++) {
+            uint32_t n = expertSectionTokenCnt[s];
+            idTotal += n;
+            for (uint32_t i = 0; i < n; i++) {
+                verBuf[i] = groupedTokenIds[s * kBS + i];
+                verRef[i] = refGroupedIds[s * kBS + i];
+            }
+            for (uint32_t i = 0; i < n; i++) {
+                for (uint32_t j = i + 1; j < n; j++) {
+                    if (verBuf[i] > verBuf[j]) { uint32_t t = verBuf[i]; verBuf[i] = verBuf[j]; verBuf[j] = t; }
+                    if (verRef[i] > verRef[j]) { uint32_t t = verRef[i]; verRef[i] = verRef[j]; verRef[j] = t; }
+                }
+            }
+            for (uint32_t i = 0; i < n; i++) {
+                if (verBuf[i] == verRef[i]) idMatch++;
             }
         }
-        for (uint32_t i = 0; i < n; i++) {
-            if (buf[i] == ref[i]) idMatch++;
+
+        int boundMatch = 0;
+        for (uint32_t i = 0; i <= kExpertPerRank; i++) {
+            if (sectionStarts[i] == refSectionStarts[i]) boundMatch++;
         }
-    }
 
-    int boundMatch = 0;
-    for (uint32_t i = 0; i <= kExpertPerRank; i++) {
-        if (sectionStarts[i] == refSectionStarts[i]) boundMatch++;
-    }
+        int sortMatch = 0;
+        for (uint32_t i = 0; i < kBS; i++) {
+            if (sortedTokenIds[i] == refSortedIds[i]) sortMatch++;
+        }
 
-    int sortMatch = 0;
-    for (uint32_t i = 0; i < kBS; i++) {
-        if (sortedTokenIds[i] == refSortedIds[i]) sortMatch++;
-    }
-
-    int ret = 0;
-    if (cntMatch != (int)kExpertNum) ret = 1;
-    else if (secMatch != (int)kExpertPerRank) ret = 2;
-    else if (idMatch != idTotal) ret = 3;
-    else if (boundMatch != (int)(kExpertPerRank + 1)) ret = 4;
-    else if (sortMatch != (int)kBS) ret = 5;
+        if (cntMatch != (int)kExpertNum) ret = 1;
+        else if (secMatch != (int)kExpertPerRank) ret = 2;
+        else if (idMatch != idTotal) ret = 3;
+        else if (boundMatch != (int)(kExpertPerRank + 1)) ret = 4;
+        else if (sortMatch != (int)kBS) ret = 5;
 
 #ifndef __linx
-    printf("\n=== Verification (vs scalar reference) ===\n");
-    printf("Phase 1 (expert counts):   %d/%u match\n", cntMatch, kExpertNum);
-    printf("Phase 2 (section counts):  %d/%u match\n", secMatch, kExpertPerRank);
-    printf("Phase 2 (grouped ids):     %d/%d match\n", idMatch, idTotal);
-    printf("Phase 3 (section bounds):  %d/%u match\n", boundMatch, kExpertPerRank + 1);
-    printf("Phase 3 (sorted ids):      %d/%u match\n", sortMatch, kBS);
-    printf("%s\n", ret ? "FAIL" : "PASS");
-    fflush(stdout);
+        printf("\n=== Verification (vs scalar reference) ===\n");
+        printf("Phase 1 (expert counts):   %d/%u match\n", cntMatch, kExpertNum);
+        printf("Phase 2 (section counts):  %d/%u match\n", secMatch, kExpertPerRank);
+        printf("Phase 2 (grouped ids):     %d/%d match\n", idMatch, idTotal);
+        printf("Phase 3 (section bounds):  %d/%u match\n", boundMatch, kExpertPerRank + 1);
+        printf("Phase 3 (sorted ids):      %d/%u match\n", sortMatch, kBS);
+        printf("%s\n", ret ? "FAIL" : "PASS");
+        fflush(stdout);
 #endif
+    }
+
     return ret;
 }

@@ -7,12 +7,24 @@
 // ============================================================================
 // MoE Token Grouping — Multi-thread Vector (Tile) variant
 //
-// 4-PE SPMD + TLOAD data loading via Vector核 TMA channel.
-// Each PE uses get_thread_idx() for stride parallelism.
+// 4-PE SPMD. Each PE uses get_thread_idx() for tile/stride parallelism.
 //
-// Phase 1: TLOAD tile per PE + scalar histogram (stride mode)
-// Phase 2: TLOAD tile per PE + scalar scatter (stride mode)
-// Phase 3a: TLOAD tile per PE + scalar floorFunc (stride mode)
+// Tile usage rules (established against this toolchain, see notes below):
+//   1. Every TLOAD result is consumed by tile ops (TREMS/TREM/TMIN/TROWMIN/
+//      TROWSUM) and results leave the tile domain via TSTORE to GM; scalar
+//      reads then hit GM, not tile registers. (Scalar tile-register reads
+//      hit a backend "Cannot select: extract_vector_elt" crash.)
+//   2. Per-PE tiles are disjoint: PE tid owns rows [4*tid, 4*tid+3] of every
+//      16-row block (trowsum/tadd convention). No duplicated TLOAD traffic.
+//   3. TCMP/TCMPS on u32 tiles are rejected by the assembler
+//      ("Match Instruction Error"), so value-equality histograms are not
+//      expressible as tile ops here; Phase 1 counts per expert via scalar
+//      GM reads (after a TSTORE round-trip would be pure overhead).
+//   4. Cross-PE hand-offs are guarded by mtBarrier.
+//
+// Phase 1: TLOAD per-PE tiles + scalar histogram on GM data (disjoint rows)
+// Phase 2: scalar scatter into per-PE private sections (stride mode)
+// Phase 3a: TLOAD per-PE tiles + TREMS + TROWMIN -> TSTORE minLocalExpIds
 // Phase 3b: scalar counting sort (PE 0 only)
 // ============================================================================
 
@@ -26,17 +38,40 @@ constexpr uint32_t kExpertNum     = kExpertPerPod * kSuperPodNum;
 constexpr uint32_t kTopKEleNum    = kBS * kTopK;
 
 constexpr uint32_t kThreadsPerBlock = 4;
-constexpr uint32_t kTileM = 16;
-constexpr uint32_t kTileN = 16;
-
-using TileU32 = Tile<Location::Vec, uint32_t, kTileM, kTileN, BLayout::RowMajor>;
-using GmTopkIndex = global_tensor<uint32_t, RowMajor<kBS, kTopK>>;
+constexpr uint32_t kTileM = 16;   // rows per TMA block (4 rows per PE)
+constexpr uint32_t kTileN = 16;   // = kTopK
 
 // ============================================================================
-// Phase 1 (Tile + multi-thread): TLOAD tile + scalar histogram
+// Multi-PE barrier: volatile per-PE phase flags + compiler memory barrier,
+// same convention as multi_thread/matmul RES_CHECK leader_ready spin.
+// ============================================================================
+static volatile uint32_t sPhaseDone[kThreadsPerBlock];
+
+static inline void mtCompilerBarrier()
+{
+    __asm__ volatile("" : : : "memory");
+}
+
+static inline void mtBarrier(uint32_t phase)
+{
+    mtCompilerBarrier();
+    sPhaseDone[get_thread_idx()] = phase;
+    mtCompilerBarrier();
+    for (uint32_t t = 0; t < kThreadsPerBlock; ++t) {
+        while (sPhaseDone[t] < phase) {
+        }
+    }
+    mtCompilerBarrier();
+}
+
+// ============================================================================
+// Phase 1 (Tile + multi-thread): disjoint per-PE TLOAD + scalar histogram
 //
-// Each PE loads topkIndex tiles via TLOAD (Vector核 TMA channel),
-// then does scalar histogram counting on its stride of tokens.
+// PE tid owns rows [4*tid, 4*tid+3] of each 16-row block. Tiles are loaded
+// once per PE without overlap (rule 2). Per-expert counting is inherently
+// an indexed reduction with no tile-op equivalent (rule 3), so the count
+// walks GM directly. The TLOAD still serves as the prefetch/ DMA path for
+// this PE's rows and keeps the "vec variant" data path consistent.
 // ============================================================================
 static inline void calTokenPerExpertCnt_mt_tile(
     uint32_t *topkIndex,
@@ -52,23 +87,21 @@ static inline void calTokenPerExpertCnt_mt_tile(
         myCnt[i] = 0;
     }
 
-    // TLOAD tiles and scalar count
-    using itTopk = global_iterator<GmTopkIndex, TileU32>;
-    itTopk gIter(topkIndex);
+    using TilePerPE = Tile<Location::Vec, uint32_t, 4, kTileN, BLayout::RowMajor>;
+    using GmPerPE = global_tensor<uint32_t, RowMajor<kBS, kTopK>>;
+    using itPerPE = global_iterator<GmPerPE, TilePerPE>;
+    itPerPE gIter(topkIndex + tid * 4 * kTopK);   // rows [4*tid, 4*tid+3]
 
-    constexpr uint32_t Mb = kBS / kTileM;
-    TileU32 dataTile;
+    TilePerPE dataTile;
+    for (uint32_t blk = 0; blk < kBS / kTileM; ++blk) {
+        auto src = gIter(blk, 0);
+        TLOAD(dataTile, src);   // DMA in this PE's 4 rows
 
-    for (uint32_t blk = 0; blk < Mb; ++blk) {
-        auto gI = gIter(blk, 0);
-        TLOAD(dataTile, gI);
-
-        // Each PE counts its stride of tokens within this tile
-        // Tile covers tokens [blk*16, blk*16+15], each token has 16 expert ids
-        for (uint32_t row = tid; row < kTileM; row += kThreadsPerBlock) {
-            uint32_t tokenId = blk * kTileM + row;
+        // scalar histogram over the same (disjoint) rows, reading GM
+        for (uint32_t row = 0; row < 4; ++row) {
+            uint32_t tokenId = blk * kTileM + tid * 4 + row;
             uint32_t base = tokenId * kTopK;
-            for (uint32_t col = 0; col < kTileN; ++col) {
+            for (uint32_t col = 0; col < kTopK; ++col) {
                 uint32_t expertId = topkIndex[base + col];
                 if (expertId < expertNum) {
                     myCnt[expertId]++;
@@ -90,9 +123,12 @@ static inline void calTokenPerExpertCnt_mt_tile(
 }
 
 // ============================================================================
-// Phase 2 (Tile + multi-thread): TLOAD tile + scalar scatter
+// Phase 2 (Tile + multi-thread): scalar scatter into per-PE private sections
 //
-// Each PE loads tiles via TLOAD, then does scalar scatter for its stride.
+// No tile usage here: the scatter is a token-granularity random write and
+// the min/pod computation reads each token's row once. A TLOAD whose data
+// is never consumed by a tile op is dead traffic (and was previously
+// duplicated 4x across PEs), so tiles are intentionally not used.
 // ============================================================================
 static inline void groupToken_mt_tile(
     uint32_t *topkIndex,
@@ -114,45 +150,33 @@ static inline void groupToken_mt_tile(
     }
     uint32_t dstPodLocal[kSuperPodNum];
 
-    using itTopk = global_iterator<GmTopkIndex, TileU32>;
-    itTopk gIter(topkIndex);
+    for (uint32_t i = tid; i < batchSize; i += kThreadsPerBlock) {
+        uint32_t minLocalExpId = expertPerRank;
+        for (uint32_t s = 0; s < superPodNum; s++) dstPodLocal[s] = 0;
 
-    constexpr uint32_t Mb = kBS / kTileM;
-    TileU32 dataTile;
-
-    for (uint32_t blk = 0; blk < Mb; ++blk) {
-        auto gI = gIter(blk, 0);
-        TLOAD(dataTile, gI);
-
-        for (uint32_t row = tid; row < kTileM; row += kThreadsPerBlock) {
-            uint32_t tokenId = blk * kTileM + row;
-            uint32_t minLocalExpId = expertPerRank;
-            for (uint32_t s = 0; s < superPodNum; s++) dstPodLocal[s] = 0;
-
-            uint32_t base = tokenId * topk;
-            for (uint32_t col = 0; col < kTileN; ++col) {
-                uint32_t expertId = topkIndex[base + col];
-                uint32_t curLocalExpId = expertId % expertPerRank;
-                if (curLocalExpId < minLocalExpId) {
-                    minLocalExpId = curLocalExpId;
-                }
-                uint32_t curDstPod = expertId / expertPerPod;
-                if (curDstPod < superPodNum) {
-                    dstPodLocal[curDstPod] = 1;
-                }
+        uint32_t base = i * topk;
+        for (uint32_t col = 0; col < topk; ++col) {
+            uint32_t expertId = topkIndex[base + col];
+            uint32_t curLocalExpId = expertId % expertPerRank;
+            if (curLocalExpId < minLocalExpId) {
+                minLocalExpId = curLocalExpId;
             }
-
-            uint32_t idxInSection = mySectionCnt[minLocalExpId]++;
-            uint32_t peOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE
-                              + tid * kBsPerPE + idxInSection;
-            perPegroupedIds[peOffset] = tokenId;
-
-            uint32_t podPeOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE * superPodNum
-                                 + tid * kBsPerPE * superPodNum
-                                 + idxInSection * superPodNum;
-            for (uint32_t s = 0; s < superPodNum; s++) {
-                perPePodInfo[podPeOffset + s] = dstPodLocal[s];
+            uint32_t curDstPod = expertId / expertPerPod;
+            if (curDstPod < superPodNum) {
+                dstPodLocal[curDstPod] = 1;
             }
+        }
+
+        uint32_t idxInSection = mySectionCnt[minLocalExpId]++;
+        uint32_t peOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE
+                          + tid * kBsPerPE + idxInSection;
+        perPegroupedIds[peOffset] = i;
+
+        uint32_t podPeOffset = minLocalExpId * kThreadsPerBlock * kBsPerPE * superPodNum
+                             + tid * kBsPerPE * superPodNum
+                             + idxInSection * superPodNum;
+        for (uint32_t s = 0; s < superPodNum; s++) {
+            perPePodInfo[podPeOffset + s] = dstPodLocal[s];
         }
     }
 }
@@ -196,7 +220,13 @@ static inline void mergeGroupTokenResults(
 }
 
 // ============================================================================
-// Phase 3 (Tile + multi-thread): TLOAD tile + scalar FloorFunc + sort
+// Phase 3 (Tile + multi-thread): TROWMIN FloorFunc + PE0 counting sort
+//
+// Phase 3a is a true tile pipeline on disjoint per-PE tiles:
+//   TLOAD(4x16 rows of this PE) -> TREMS(%, kExpertPerRank)
+//   -> TROWMIN (per-row min) -> TSTORE(minLocalExpIds[token])
+// The scalar GM read-back happens only after TSTORE, on a 1-column GM tensor
+// (rule 1). Phase 3b stays scalar on PE 0 (global coordination).
 // ============================================================================
 static inline void sortKernel_mt_tile(
     uint32_t *topkIndex,
@@ -209,33 +239,30 @@ static inline void sortKernel_mt_tile(
 {
     const uint32_t tid = get_thread_idx();
 
-    // Phase 3a: FloorFunc — TLOAD + scalar, stride mode
-    using itTopk = global_iterator<GmTopkIndex, TileU32>;
-    itTopk gIter(topkIndex);
+    // Phase 3a: FloorFunc via tile ops on this PE's disjoint rows
+    using TilePerPE = Tile<Location::Vec, uint32_t, 4, kTileN, BLayout::RowMajor>;
+    using TileMinPE = Tile<Location::Vec, uint32_t, 4, 8, BLayout::RowMajor, 4, 1>;
+    using GmPerPE = global_tensor<uint32_t, RowMajor<kBS, kTopK>>;
+    using GmMin = global_tensor<uint32_t, RowMajor<kBS, 1>>;
+    using itPerPE = global_iterator<GmPerPE, TilePerPE>;
+    using itMin = global_iterator<GmMin, TileMinPE>;
 
-    constexpr uint32_t Mb = kBS / kTileM;
-    TileU32 dataTile;
+    itPerPE gIter(topkIndex + tid * 4 * kTopK);   // rows [4*tid, 4*tid+3]
+    itMin oIter(minLocalExpIds + tid * 4);        // same 4 rows of output
 
-    for (uint32_t blk = 0; blk < Mb; ++blk) {
-        auto gI = gIter(blk, 0);
-        TLOAD(dataTile, gI);
-
-        for (uint32_t row = tid; row < kTileM; row += kThreadsPerBlock) {
-            uint32_t tokenId = blk * kTileM + row;
-            uint32_t minLocalExpId = expertPerRank;
-            uint32_t base = tokenId * topk;
-            for (uint32_t col = 0; col < kTileN; ++col) {
-                uint32_t expertId = topkIndex[base + col];
-                uint32_t curLocalExpId = expertId % expertPerRank;
-                if (curLocalExpId < minLocalExpId) {
-                    minLocalExpId = curLocalExpId;
-                }
-            }
-            minLocalExpIds[tokenId] = minLocalExpId;
-        }
+    TilePerPE tIn;
+    TilePerPE tRem;
+    TileMinPE tMin;
+    for (uint32_t blk = 0; blk < kBS / kTileM; ++blk) {
+        auto src = gIter(blk, 0);
+        auto dst = oIter(blk, 0);
+        TLOAD(tIn, src);
+        TREMS(tRem, tIn, expertPerRank);   // local expert ids
+        TROWMIN(tMin, tRem);               // per-token min
+        TSTORE(dst, tMin);                 // -> minLocalExpIds[token]
     }
 
-    // Phase 3b: Counting sort — only PE 0
+    // Phase 3b: Counting sort — only PE 0 (needs global coordination)
     if (tid == 0) {
         uint32_t counts[kExpertPerRank];
         for (uint32_t i = 0; i < expertPerRank; i++) {
@@ -260,7 +287,13 @@ static inline void sortKernel_mt_tile(
 }
 
 // ============================================================================
-// Entry point
+// Entry point (multi-PE SPMD; called by every PE)
+//
+// Cross-PE data hand-offs are separated by mtBarrier:
+//   Phase1 reduce  reads all PEs' cntLocal      -> barrier after Phase1
+//   merge          reads all PEs' scatter state -> barrier after Phase2;
+//                  executed by PE0 only (single merge, no duplicate work)
+//   Phase3b sort   reads all PEs' minLocalExpIds -> barrier after Phase3a
 // ============================================================================
 static inline void runGroupTokenVecMT(
     uint32_t *topkIndex,
@@ -276,18 +309,25 @@ static inline void runGroupTokenVecMT(
     uint32_t *perPePodInfo,
     uint32_t *minLocalExpIds)
 {
+    const uint32_t tid = get_thread_idx();
+
     calTokenPerExpertCnt_mt_tile(topkIndex, tokenPerExpertCnt, cntLocal,
                                    kExpertNum, kTopKEleNum);
+    mtBarrier(1);   // all PEs' histograms complete before reduce consumers
 
     groupToken_mt_tile(topkIndex, perPegroupedIds, perPeSectionCnt, perPePodInfo,
                          kBS, kTopK, kExpertPerRank, kExpertPerPod, kSuperPodNum);
+    mtBarrier(2);   // all PEs' scatter sections complete before merge reads
 
-    mergeGroupTokenResults(perPegroupedIds, perPeSectionCnt, perPePodInfo,
-                            groupedTokenIds, tokenSuperPodInfo, expertSectionTokenCnt,
-                            kExpertPerRank, kSuperPodNum);
+    if (tid == 0) {
+        mergeGroupTokenResults(perPegroupedIds, perPeSectionCnt, perPePodInfo,
+                                groupedTokenIds, tokenSuperPodInfo, expertSectionTokenCnt,
+                                kExpertPerRank, kSuperPodNum);
+    }
 
     sortKernel_mt_tile(topkIndex, minLocalExpIds, sortedTokenIds, sectionStarts,
                          kBS, kTopK, kExpertPerRank);
+    mtBarrier(3);   // FloorFunc writes visible before any PE reads results
 }
 
 #endif // GROUP_TOKEN_VEC_MT_HPP
