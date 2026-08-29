@@ -1,6 +1,6 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
-#include "deepseek/moe/moe_combine_v2.hpp"
+#include "moe_combine/moe_combine_v2.hpp"
 using namespace pto;
 using namespace supernpu::tile_isa;
 

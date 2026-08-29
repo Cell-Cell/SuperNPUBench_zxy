@@ -28,7 +28,8 @@
  * 架构映射 (Ascend → PTO):
  *   - GM 缓冲     : 全局数组 (g_mmX/g_mmY/g_mmTopkIds/.../g_mmWorkspace), 单地址空间
  *   - 16 核 AIV 分片: 4 PE 线程 (get_thread_idx()=0..3), 每线程承载 4 个伪核;
- *                     token 域按 16 伪核 × 16 token 分片, 核×轮结构保留
+ *                     token 域按 16 伪核 ceil 分片 (bs>=16: 每核 bs/16 连续
+ *                     token; bs<16: 前 bs 核各 1 token, 尾核空转), 核×轮结构保留
  *   - AIC         : 冒烟读 x[0] (读到即丢弃, 不写输出)
  *   - MC2 跨 rank : epWorldSize=1 自回环, CrossRankSyncInWorldSize/WinRank 读写
  *                   退化为本地操作 (与源注释语义一致)
@@ -453,13 +454,17 @@ struct MegaMoeWave {
         float y2[kMoeHiddenDim / 2U];
         float y3[kMoeH];
         const uint32_t tid = get_thread_idx();
-        const uint32_t perCore = tilingData_.bs / kBlockAivNum;  // 16 token/核
+        // ceil 分片: bs < 16 核时每核至多 1 token, 尾部核空转 (保持核×轮结构;
+        // bs % 16 == 0 时与源 bs/16 连续分片逐 token 一致)
+        const uint32_t perCore =
+            (tilingData_.bs + kBlockAivNum - 1U) / kBlockAivNum;
 
         // 每伪核 (16 核 = 4 线程 × 4 伪核) 处理 perCore 个连续 token (源 16 核分片)
         for (uint32_t lc = 0; lc < kBlockAivNum / 4U; ++lc) {
             const uint32_t coreIdx = tid * (kBlockAivNum / 4U) + lc;
             for (uint32_t i = 0; i < perCore; ++i) {
                 const uint32_t token = coreIdx * perCore + i;
+                if (token >= tilingData_.bs) break;  // bs < 16 核时尾核空转
 
                 // 路由 (源 ProcessMoeExpertStages 的 expert 分配): topkIds[token]
                 const int32_t expert = g_mmTopkIds[token * tilingData_.topK];
@@ -645,8 +650,11 @@ void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
 
 #ifdef MEGA_MOE_SIM_FAKE
     // ============ 源 10321-10374 camodel 仿真快路径 (保留全部 tile 原语) ============
+    // 轮数 ceil 化 + 越界保护 (与 A5 mega_moe_main.asc 同步): bs*h 不足
+    // 16 伪核 × kChunkElems 时仅部分核各搬 1 块, 尾核空转
     const uint32_t fakeTotalElems = tilingData.bs * tilingData.h;
-    const uint32_t fakeRounds = fakeTotalElems / (kBlockAivNum * kChunkElems);
+    const uint32_t fakeRounds =
+        (fakeTotalElems + kBlockAivNum * kChunkElems - 1U) / (kBlockAivNum * kChunkElems);
     using gmShape = global_tensor<float, RowMajor<1, kChunkElems>>;
     using tileShape = Tile<Location::Vec, float, 1, kChunkElems, BLayout::RowMajor>;
     using itGM = global_iterator<gmShape, tileShape>;
@@ -658,6 +666,7 @@ void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
         const uint32_t coreIdx = lc;
         for (uint32_t round = 0U; round < fakeRounds; ++round) {
             const uint32_t base = (round * kBlockAivNum + coreIdx) * kChunkElems;
+            if (base >= fakeTotalElems) break;  // 尾核空转
             tileShape t;
             auto srcGT = xIter(0, base);
             TLOAD(t, srcGT);
@@ -740,7 +749,9 @@ void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
 
     // 16 伪核全量循环: 与线程数解耦 (单线程/多线程均覆盖全部伪核, 结果幂等;
     // 修正原 "tid*4+lc" 分片在线程数 != 4 时覆盖不足导致的 R2 失败)
-    const uint32_t perCore = tilingData.bs / kBlockAivNum;
+    // ceil 分片: bs < 16 核时每核至多 1 token, 尾部核空转 (bs % 16 == 0 时
+    // 与源 bs/16 连续分片逐 token 一致)
+    const uint32_t perCore = (tilingData.bs + kBlockAivNum - 1U) / kBlockAivNum;
     {
         float y1[kMoeHiddenDim];
         float y2[kMoeHiddenDim / 2U];
@@ -749,6 +760,7 @@ void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
             const uint32_t coreIdx = lc;
             for (uint32_t i = 0; i < perCore; ++i) {
                 const uint32_t token = coreIdx * perCore + i;
+                if (token >= tilingData.bs) break;  // bs < 16 核时尾核空转
 
                 // 路由 (源 expert 分配): topkIds[token*topK]
                 const int32_t expert = g_mmTopkIds[token * tilingData.topK];
@@ -820,6 +832,7 @@ void mega_moe_sim_kernel(float* yOut, float* xIn, int64_t* tokOut)
                 uint32_t cnt = 0U;
                 for (uint32_t i = 0; i < perCore; ++i) {
                     const uint32_t token = core * perCore + i;
+                    if (token >= tilingData.bs) break;  // bs < 16 核时尾核空转
                     if (static_cast<uint32_t>(g_mmTopkIds[token * tilingData.topK]) == e) ++cnt;
                 }
                 stats[core * tilingData.moeExpertPerRank + e] = static_cast<int32_t>(cnt);

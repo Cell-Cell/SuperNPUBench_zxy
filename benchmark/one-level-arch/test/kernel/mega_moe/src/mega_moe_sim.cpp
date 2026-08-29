@@ -195,7 +195,7 @@ int main()
 #ifdef MEGA_MOE_SIM_FAKE
     static_assert(kH % 2 == 0, "kH must be even");
 #else
-    static_assert(kBS % 16 == 0, "kBS must be divisible by 16 AIV pseudo-cores");
+    static_assert(kBS > 0, "kBS must be positive");  // 分片为 ceil 制, 允许 bs < 16 伪核
     static_assert(kH % 2 == 0, "kH must be even");
 #endif
     constexpr uint32 kTotalElems = kBS * kH;
