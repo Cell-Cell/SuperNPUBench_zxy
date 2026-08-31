@@ -7,7 +7,7 @@
 
 using namespace pto;
 
-static constexpr uint32_t kMoeBS = 8;
+static constexpr uint32_t kMoeBS = 16;
 static constexpr uint32_t kMoeH = 128;
 static constexpr uint32_t kMoeHiddenDim = 256;
 static constexpr uint32_t kMoeExperts = 2;

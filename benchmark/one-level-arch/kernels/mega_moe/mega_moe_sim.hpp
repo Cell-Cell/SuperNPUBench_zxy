@@ -71,13 +71,13 @@ namespace mega_moe {
 // ============================================================================
 constexpr uint32_t kMoeExpertPerRank = 2U;   // 本卡 MoE 专家数 (weight1 表达)
 #ifndef kBS
-#define kBS 256
+#define kBS 16
 #endif
 #ifndef kH
-#define kH 128
+#define kH 32
 #endif
 #ifndef kHidden
-#define kHidden 256
+#define kHidden 64
 #endif
 constexpr uint32_t kMoeBs = kBS;               // token 数 (Makefile -DkBS)
 constexpr uint32_t kMoeH = kH;                 // 隐层维度 (Makefile -DkH)

@@ -1,11 +1,11 @@
 # MegaMoe A8W8 (完整真机流水) 迁移样例 Makefile
-# 默认规格 256×128×256 (与源样例一致); 可通过 BS/H/HIDDEN 参数化缩小验证规模
+# 仿真规格 16×32×64 (与 compile.all 一致, 已跑通 gfsim); 可通过 BS/H/HIDDEN 参数化调整
 
 TESTCASE ?= mega_moe_sim
 
-BS ?= 256
-H ?= 128
-HIDDEN ?= 256
+BS ?= 16
+H ?= 32
+HIDDEN ?= 64
 
 LINX_TOOLCHAIN ?= /mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin
 

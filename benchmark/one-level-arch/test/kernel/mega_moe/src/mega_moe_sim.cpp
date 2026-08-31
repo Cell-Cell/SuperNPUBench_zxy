@@ -22,11 +22,11 @@
 #include "fileop.h"
 
 #ifndef kBS
-#define kBS 256
+#define kBS 16
 #endif
 
 #ifndef kH
-#define kH 128
+#define kH 32
 #endif
 
 using uint32 = uint32_t;
