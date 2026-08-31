@@ -1,0 +1,55 @@
+clang++: /mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/src/llvm-project/llvm/lib/Target/LinxV5/LinxV5TRegToOffset.cpp:906: void __verifyGPR(llvm::MachineBasicBlock&): Assertion `0 && "BGPR multi set!"' failed.
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace, preprocessed source, and associated run script.
+Stack dump:
+0.	Program arguments: /mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang++ -c -mlxbc -O0 -std=c++20 -I/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0828/SuperNPUBench/benchmark/one-level-arch/test/common/src -I/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0828/SuperNPUBench/benchmark/one-level-arch/kernels -D__linx -DENABLE_TENSOR_INSTR issue-materials/llvm-v4i64-buildvector/src/min_repro.cpp -o /dev/null
+1.	<eof> parser at end of file
+2.	Code generation
+3.	Running pass 'Function Pass Manager' on module 'issue-materials/llvm-v4i64-buildvector/src/min_repro.cpp'.
+4.	Running pass 'LinxV5 Treg to Offset' on function '@_ZN3pto18layout_type_to_strENS_10LayoutEnumE'
+ #0 0x0000aaaae31b0104 PrintStackTraceSignalHandler(void*) Signals.cpp:0:0
+ #1 0x0000aaaae31ae090 llvm::sys::RunSignalHandlers() (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x1d2e090)
+ #2 0x0000aaaae31ae414 llvm::sys::CleanupOnSignal(unsigned long) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x1d2e414)
+ #3 0x0000aaaae310c16c CrashRecoverySignalHandler(int) CrashRecoveryContext.cpp:0:0
+ #4 0x0000ffff9aef48dc (linux-vdso.so.1+0x8dc)
+ #5 0x0000ffff9a970d88 raise /build/glibc-fci4Zo/glibc-2.31/signal/../sysdeps/unix/sysv/linux/raise.c:51:1
+ #6 0x0000ffff9a95daac abort /build/glibc-fci4Zo/glibc-2.31/stdlib/abort.c:81:7
+ #7 0x0000ffff9a96a494 __assert_fail_base /build/glibc-fci4Zo/glibc-2.31/assert/assert.c:91:7
+ #8 0x0000ffff9a96a4fc (/lib/aarch64-linux-gnu/libc.so.6+0x2d4fc)
+ #9 0x0000aaaae2104440 llvm::LinxV5TRegToOffsetOpt::runOnMachineFunction(llvm::MachineFunction&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0xc84440)
+#10 0x0000aaaae2576f98 llvm::MachineFunctionPass::runOnFunction(llvm::Function&) (.part.0) MachineFunctionPass.cpp:0:0
+#11 0x0000aaaae2a918cc llvm::FPPassManager::runOnFunction(llvm::Function&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x16118cc)
+#12 0x0000aaaae2a91b10 llvm::FPPassManager::runOnModule(llvm::Module&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x1611b10)
+#13 0x0000aaaae2a922f0 llvm::legacy::PassManagerImpl::run(llvm::Module&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x16122f0)
+#14 0x0000aaaae350d154 clang::EmitBackendOutput(clang::DiagnosticsEngine&, clang::HeaderSearchOptions const&, clang::CodeGenOptions const&, clang::TargetOptions const&, clang::LangOptions const&, llvm::StringRef, llvm::Module*, clang::BackendAction, std::unique_ptr<llvm::raw_pwrite_stream, std::default_delete<llvm::raw_pwrite_stream>>) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x208d154)
+#15 0x0000aaaae41a4fc0 clang::BackendConsumer::HandleTranslationUnit(clang::ASTContext&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x2d24fc0)
+#16 0x0000aaaae501099c clang::ParseAST(clang::Sema&, bool, bool) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x3b9099c)
+#17 0x0000aaaae41a3ed4 clang::CodeGenAction::ExecuteAction() (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x2d23ed4)
+#18 0x0000aaaae3bda48c clang::FrontendAction::Execute() (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x275a48c)
+#19 0x0000aaaae3b783fc clang::CompilerInstance::ExecuteAction(clang::FrontendAction&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x26f83fc)
+#20 0x0000aaaae3ccb0b8 clang::ExecuteCompilerInvocation(clang::CompilerInstance*) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x284b0b8)
+#21 0x0000aaaae20abbe4 cc1_main(llvm::ArrayRef<char const*>, char const*, void*) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0xc2bbe4)
+#22 0x0000aaaae20a5bf4 ExecuteCC1Tool(llvm::SmallVectorImpl<char const*>&) driver.cpp:0:0
+#23 0x0000aaaae3a1ff5c void llvm::function_ref<void ()>::callback_fn<clang::driver::CC1Command::Execute(llvm::ArrayRef<llvm::Optional<llvm::StringRef>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>*, bool*) const::'lambda'()>(long) Job.cpp:0:0
+#24 0x0000aaaae310c2c8 llvm::CrashRecoveryContext::RunSafely(llvm::function_ref<void ()>) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x1c8c2c8)
+#25 0x0000aaaae3a20630 clang::driver::CC1Command::Execute(llvm::ArrayRef<llvm::Optional<llvm::StringRef>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>*, bool*) const (.part.0) Job.cpp:0:0
+#26 0x0000aaaae39f1300 clang::driver::Compilation::ExecuteCommand(clang::driver::Command const&, clang::driver::Command const*&, bool) const (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x2571300)
+#27 0x0000aaaae39f1ba8 clang::driver::Compilation::ExecuteJobs(clang::driver::JobList const&, llvm::SmallVectorImpl<std::pair<int, clang::driver::Command const*>>&, bool) const (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x2571ba8)
+#28 0x0000aaaae39fab8c clang::driver::Driver::ExecuteCompilation(clang::driver::Compilation&, llvm::SmallVectorImpl<std::pair<int, clang::driver::Command const*>>&) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0x257ab8c)
+#29 0x0000aaaae20aa290 clang_main(int, char**) (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0xc2a290)
+#30 0x0000ffff9a95de10 __libc_start_main /build/glibc-fci4Zo/glibc-2.31/csu/../csu/libc-start.c:342:3
+#31 0x0000aaaae20a5744 _start (/mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin/clang+++0xc25744)
+clang-15: error: clang frontend command failed with exit code 134 (use -v to see invocation)
+clang version 15.0.4 (linx64v5-musl-local 611105f2be11fab9a8ef20bd02b740f2c5d786b3)
+Target: linx64v5-unknown-linux-musl
+Thread model: posix
+InstalledDir: /mnt/workspace/gitCode/cann/Dev-experience/v300_tag_0824/linx-toolchain-build/output/linx_blockisa_llvm_musl/bin
+clang-15: note: diagnostic msg: 
+********************
+
+PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT:
+Preprocessed source(s) and associated run script(s) are located at:
+clang-15: note: diagnostic msg: /tmp/min_repro-98f9a9.cpp
+clang-15: note: diagnostic msg: /tmp/min_repro-98f9a9.sh
+clang-15: note: diagnostic msg: 
+
+********************

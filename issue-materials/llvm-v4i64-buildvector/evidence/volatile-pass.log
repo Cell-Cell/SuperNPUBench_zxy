@@ -1,0 +1,1 @@
+# volatile variant compiles clean (exit 0, no output) — mitigation verified
