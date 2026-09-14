@@ -20,7 +20,7 @@ Default root: `/home/wangyu/Code/SuperScalar`（下文 `$ROOT`）。
 | N / `g_n` / `tN` / `tile_n` | **R** / `g_r` / `tR` / `tile_r` | reduce / col |
 | `Nb` | `Rb` | `# R-tiles = ceil(g_r / tile_r)` |
 
-`tiling[4] = {g_a, g_r, tile_a, tile_r}`.
+Dynamic tiling structs carry shape fields only; all variants use kernel-local epsilon = 1e-6f.
 
 ## What it is
 
@@ -75,7 +75,7 @@ Pass1:
   per R-tile: TLOAD → TCVT → TMUL(x,x) → TROWSUM → TADD(sum, sum, cur)
 
 Pass1.5:
-  TMULS(mean, sum, 1/g_r) → TADDS(eps) → Newton rsqrt → rms
+  TMULS(mean, sum, 1/g_r) → TADDS(eps) → regbase rsqrt (TRECIP → TSQRT → one Newton step → compensated residual) → rms
 
 Pass2  (per R-tile):
   TLOAD → TCVT → TROWEXPANDMUL(x, rms) → TCVT → TSTORE
