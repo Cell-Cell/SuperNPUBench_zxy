@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/broadcast/broadcast.hpp"
+#include "multi_thread/broadcast/detail/broadcast.hpp"
 
 #include <cstddef>
 #include <cstdint>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/concat/concat_gather.hpp"
+#include "multi_thread/concat/detail/concat_gather.hpp"
 
 #include <cstddef>
 #include <cstdint>

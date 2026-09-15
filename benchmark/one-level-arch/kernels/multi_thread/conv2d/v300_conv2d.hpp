@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/conv2d/v300_conv2d.hpp"
+#include "multi_thread/conv2d/detail/v300_conv2d.hpp"
 
 #include <cstdint>
 
