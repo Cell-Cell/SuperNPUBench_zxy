@@ -20,6 +20,13 @@ group_runtime := on
 DTYPE ?= float
 LP_MODE ?= FP8
 
+# matmul_quantize: fused matmul -> block quantize -> (data + scale).
+# QUANT_MODE selects the quantized data dtype; USE_ASSEMBLE toggles the
+# TASSEMBLY (B.ASSEMBLE) pack path (compile/disasm only -- gfsim does not
+# model B.ASSEMBLE, so functional runs use USE_ASSEMBLE=0).
+QUANT_MODE ?= FP8
+USE_ASSEMBLE ?= 1
+
 ifeq ($(filter $(DTYPE),float __bf16 __half),)
 $(error Unsupported DTYPE '$(DTYPE)'; supported: float, __bf16, __half)
 endif
@@ -96,8 +103,26 @@ DEFINES += -DSCALE_DTYPE=$(SCALE_DTYPE)
 DEFINES += -DSCALE_GROUP=$(SCALE_GROUP)
 else ifeq ($(TESTCASE),matmul_kchains)
 SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/matmul_kchains.cpp
+else ifeq ($(TESTCASE),matmul_quantize)
+# Fused matmul -> block quantize -> (data + scale). QUANT_MODE picks the
+# quantized data dtype (the per-row scale is always E8M0, group 32);
+# USE_ASSEMBLE=1 enables the TASSEMBLY (B.ASSEMBLE) pack path.
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/matmul_quantize.cpp
+ifeq ($(QUANT_MODE),FP8)
+QUANT_OUT_DTYPE := __fp8_e4m3
+else ifeq ($(QUANT_MODE),FP4)
+QUANT_OUT_DTYPE := __fp4_e2m1x2
 else
-$(error Unsupported TESTCASE=$(TESTCASE); expected matmul_shared, matmul_reuseB, matmul_blockM, matmul_lowp, matmul_lowp_blockM, or matmul_kchains)
+$(error Unsupported QUANT_MODE=$(QUANT_MODE); expected FP8 or FP4)
+endif
+DEFINES += -DOUT_DTYPE=$(QUANT_OUT_DTYPE)
+DEFINES += -DUSE_ASSEMBLE=$(USE_ASSEMBLE)
+else ifeq ($(TESTCASE),matmul_hif4_l1_quantize)
+# Fused matmul -> first-level HiF4 quantization. Output data is packed
+# HiF4X2; scale is one raw E6M2 byte per row and 64-column group.
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/matmul_hif4_l1_quantize.cpp
+else
+$(error Unsupported TESTCASE=$(TESTCASE); expected matmul_shared, matmul_reuseB, matmul_blockM, matmul_lowp, matmul_lowp_blockM, matmul_kchains, matmul_quantize, or matmul_hif4_l1_quantize)
 endif
 
 # Keep the default (FP32) ELF name unchanged for backward compatibility;
@@ -122,6 +147,10 @@ TARGET = $(ELF_HEAD)_$(TESTCASE)_B$(B)_M$(M)_N$(N)_K$(K)_tM$(tM)_tN$(tN)_ChainK$
 else
 TARGET = $(ELF_HEAD)_$(TESTCASE)_B$(B)_M$(M)_N$(N)_K$(K)_tM$(tM)_tN$(tN)_ChainK$(ChainK)_DType$(DTYPE).elf
 endif
+else ifeq ($(TESTCASE),matmul_quantize)
+TARGET = $(ELF_HEAD)_$(TESTCASE)_$(QUANT_MODE)_ASM$(USE_ASSEMBLE)_B$(B)_M$(M)_N$(N)_K$(K)_tM$(tM)_tN$(tN)_tK$(tK).elf
+else ifeq ($(TESTCASE),matmul_hif4_l1_quantize)
+TARGET = $(ELF_HEAD)_$(TESTCASE)_B$(B)_M$(M)_N$(N)_K$(K)_tM$(tM)_tN$(tN)_tK$(tK).elf
 else ifeq ($(DTYPE),float)
 TARGET = $(ELF_HEAD)_$(TESTCASE)_B$(B)_M$(M)_N$(N)_K$(K)_tM$(tM)_tN$(tN)_tK$(tK).elf
 else

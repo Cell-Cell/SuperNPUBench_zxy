@@ -26,10 +26,13 @@ using namespace pto;
 //  10. Loop-invariant ops hoisted: qkOptions/pvOptions outside both loops,
 //      Q load outside Kb loop (Q depends on i, not j).
 //
-// QK does not use transpose_b(): K's [Skv, qD] row-major buffer is described
-// as RowMajor<Skv, qD> so the CUBE reads K^T [qD, kTk] directly.
-// PV uses transpose_b(): the V tile is [kPVStoredChunk, vD] = [K, N]; TransB
-// makes the CUBE read B in K-major order, matching the matmul's B operand.
+// PTO v0.58: SharedMatrixRight without transpose_b maps BValidRows to
+// ValidCol (N), causing AValidCols(qD) != BValidRows(kTk) when kTk != qD.
+// transpose_b() flips this so BValidRows = ValidRow (K = qD), matching A
+// for any kTk.  The K tile stores K^T [qD, kTk] data; transpose_b tells
+// TMATMUL to read it as [K=qD, N=kTk], which is the correct QK^T shape.
+// PV likewise needs transpose_b: V tile [kTk, vD] must be read as
+// [K=kTk, N=vD].
 
 // Convert two logical scalar columns into one packed-x2 cube element.
 template <is_tile_data_v tile_shape_out, is_tile_data_v tile_shape_in>
@@ -98,8 +101,7 @@ void flash_attention_2d_unroll_shared_impl(
     // K tile [kQKStoredChunk, kTk] — K^T shape, no transpose_b needed.
     using tileKMatrix =
         SharedMatrixRight<matrix_dtype, kQKStoredChunk, kTk>;
-    // V tile [kPVStoredChunk, vD] — [K, N] shape. The PV TMATMUL uses
-    // transpose_b() so the CUBE reads B in K-major order.
+    // V tile [kPVStoredChunk, vD] — natural [K, N] right-operand shape.
     using tileVMatrix =
         SharedMatrixRight<matrix_dtype, kPVStoredChunk, vD>;
     using tileQ = SharedTile<tileQMatrix>;
@@ -133,9 +135,21 @@ void flash_attention_2d_unroll_shared_impl(
     using tileOCast =
         std::conditional_t<(kPeTm <= 16), tileOCastM16, tileOCastM32>;
 
-    // Change 4: vector state tiles use VecTileM32 (CubeM32 layout) with
-    // vector_dtype.
-    using tileMax = VecTileM32<vector_dtype, 32, 1, kPeTm, 1>;
+    // PTO #311: TROWSUM/TROWMAX require the dst to have the same physical
+    // storage as the src (destinationShape = [cellRows, source.col]).
+    // tileReduce mirrors tileW's [kPeTm, kTk] shape with ValidCol=1.
+    using tileReduceM16 = VecTileM16<vector_dtype, kPeTm, kTk, kPeTm, 1>;
+    using tileReduceM32 = VecTileM32<vector_dtype, kPeTm, kTk, kPeTm, 1>;
+    using tileReduce =
+        std::conditional_t<(kPeTm <= 16), tileReduceM16, tileReduceM32>;
+
+    // TROWEXPAND* require a single-column (Cols=1) broadcast source.
+    // tileMax is the compact form; TCVT copies from tileReduce after the
+    // reduction.
+    using tileMaxM16 = VecTileM16<vector_dtype, kPeTm, 1, kPeTm, 1>;
+    using tileMaxM32 = VecTileM32<vector_dtype, kPeTm, 1, kPeTm, 1>;
+    using tileMax =
+        std::conditional_t<(kPeTm <= 16), tileMaxM16, tileMaxM32>;
     using tileSum = tileMax;
     using tileScale = tileMax;
 
@@ -164,7 +178,7 @@ void flash_attention_2d_unroll_shared_impl(
     constexpr int Kb = (Skv + kTk - 1) / kTk;
 
     // Loop-invariant fixpipe options — hoisted outside both loops.
-    constexpr auto qkOptions = fixp::keep_acc();
+    constexpr auto qkOptions = fixp::keep_acc().transpose_b();
     constexpr auto pvOptions = fixp::keep_acc().transpose_b();
 
 #pragma clang loop unroll(full)
@@ -195,8 +209,10 @@ void flash_attention_2d_unroll_shared_impl(
             TMULS(tW, tW, scale);
 
             // --- Softmax ---
+            tileReduce tLocalMaxR;
+            TROWMAX(tLocalMaxR, tW);
             tileMax tLocalMax;
-            TROWMAX(tLocalMax, tW);
+            TCVT(tLocalMax, tLocalMaxR);
 
             tileMax tNewMax;
             tileScale tScale;
@@ -214,8 +230,10 @@ void flash_attention_2d_unroll_shared_impl(
             // Exponentiate current scores (common to both branches)
             TROWEXPANDEXPDIF(tW, tW, tNewMax);
 
+            tileReduce tLocalSumR;
+            TROWSUM(tLocalSumR, tW);
             tileSum tLocalSum;
-            TROWSUM(tLocalSum, tW);
+            TCVT(tLocalSum, tLocalSumR);
 
             tileSum tNewSum;
             if (j == 0) {

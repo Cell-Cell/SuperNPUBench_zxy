@@ -6,6 +6,13 @@
 # subsequent shape groups (fixpipe, subview, capacity-bound, Sq=1024, long-context).
 : "${COMPILER_DIR:?Set COMPILER_DIR to the Linx compiler bin directory}"
 
+# fa_lowp: MXFP4 Q/K/V, BF16 QK+softmax, then MXFP4 P/V matmul.
+make diss TESTCASE=fa_lowp \
+    COMPILER_DIR="$COMPILER_DIR" \
+    FA_MODE=MXFP4_VECBF16 Sq=256 Skv=256 Tm=128 Tk=128 \
+    X_dim=1 Y_dim=2
+
+
 # Multi-tile variants: stage two Q tiles and two K/V tiles per unrolled group.
 for mode in \
     FP32_VECFP32 \
