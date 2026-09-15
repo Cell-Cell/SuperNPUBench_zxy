@@ -36,7 +36,9 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
                                 scale_dtype *b_scale_ptr) {
     constexpr int kPeNum = 4;
     constexpr int kGroupM = tM <= 128 ? tM : 128;
-    constexpr int kPeM = kGroupM <= 64 ? 16 : 32;
+    constexpr int kTileRows = kGroupM <= 64 ? 64 : 128;
+    constexpr int kValidRowM = (gM < kTileRows) ? gM : kTileRows;
+    constexpr int kPeM = kValidRowM <= 64 ? 16 : 32;
     constexpr int kStoredGK = gK / PackedFactor;
     constexpr int kStoredTK = tK / PackedFactor;
     constexpr int kScaleK = (tK + ScaleGroup - 1) / ScaleGroup;
@@ -44,20 +46,25 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
 
     static_assert(PackedFactor == 1 || PackedFactor == 2,
                   "PackedFactor must be 1 (FP8) or 2 (FP4x2)");
-    static_assert(gM % tM == 0, "M must be divisible by tM");
     static_assert(gN % tN == 0, "N must be divisible by tN");
     static_assert(gK % tK == 0, "K must be divisible by tK");
     static_assert(gK % PackedFactor == 0 && tK % PackedFactor == 0,
                   "K must be divisible by the packed element factor");
     static_assert(tM % kPeNum == 0,
                   "tM must be divisible by the PE count");
-    static_assert(tM % kGroupM == 0 && gM % kGroupM == 0,
-                  "M dimensions must be divisible by group_M");
-    static_assert(gM % (blockM * kGroupM) == 0,
-                  "gM must be divisible by blockM * group_M");
+    static_assert(tM % kGroupM == 0,
+                  "tM must be divisible by group_M");
+    static_assert(gM % kGroupM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kGroupM or smaller than it");
+    static_assert(gM % kPeM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kPeM, or a partial tile (gM < kGroupM)");
+    static_assert(gM % (blockM * kGroupM) == 0 || (gM < kGroupM && blockM == 1),
+                  "gM must be divisible by blockM * kGroupM, or partial tile with blockM=1");
     static_assert(gN % (blockN * tN) == 0,
                   "gN must be divisible by blockN * tN");
     static_assert(blockM >= 1, "blockM must be at least 1");
+    static_assert(gM >= kGroupM || blockM == 1,
+                  "blockM > 1 requires gM >= kGroupM");
     static_assert(blockN >= 1, "blockN must be at least 1");
     static_assert(kGroupM >= 1 && kGroupM <= 128,
                   "cooperative group_M must be in the range 1..128");
@@ -74,7 +81,7 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
     using gmBSlice = global_tensor<dtype, RowMajor<kStoredTK, gN>>;
     using gmC = global_tensor<float, RowMajor<gM, gN>>;
 
-    using tileAMatrix = SharedMatrixLeft<dtype, kGroupM, tK>;
+    using tileAMatrix = SharedMatrixLeft<dtype, kTileRows, tK, kValidRowM, tK>;
     using tileBMatrix = SharedMatrixRight<dtype, tK, tN>;
     using tileAShared = SharedTile<tileAMatrix>;
     using tileBShared = SharedTile<tileBMatrix>;
@@ -91,8 +98,8 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
     using gmBScale =
         global_tensor<scale_dtype, RowMajor<gK / ScaleGroup, gN>>;
     using tileAScaleMatrix =
-        SharedMatrixLeft<scale_dtype, kGroupM, kPaddedScaleK,
-                         kGroupM, kScaleK>;
+        SharedMatrixLeft<scale_dtype, kTileRows, kPaddedScaleK,
+                         kValidRowM, kScaleK>;
     using tileBScaleMatrix =
         SharedMatrixRight<scale_dtype, kPaddedScaleK, tN,
                           kScaleK, tN>;
@@ -118,7 +125,7 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
     itAScale gIterAScale(a_scale_ptr);
     itBScale gIterBScale(b_scale_ptr);
 
-    constexpr int Mb = gM / kGroupM;
+    constexpr int Mb = (gM + kGroupM - 1) / kGroupM;
     constexpr int Nb = gN / tN;
     constexpr int Kb = gK / tK;
     constexpr int Mbi = Mb / blockM;
@@ -204,9 +211,17 @@ void matmul_shared_lowp_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr,
             for (int mi = 0; mi < blockM; ++mi) {
 #pragma clang loop unroll(full)
                 for (int nj = 0; nj < blockN; ++nj) {
-                    auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
-                                     bj * blockN + nj);
-                    TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                    if constexpr (gM >= kGroupM) {
+                        auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
+                                         bj * blockN + nj);
+                        TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                    } else {
+                        if (((bi * blockM + mi) * kPeNum + static_cast<int>(tid)) * kPeM < gM) {
+                            auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
+                                             bj * blockN + nj);
+                            TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                        }
+                    }
                 }
             }
         }

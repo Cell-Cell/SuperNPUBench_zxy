@@ -27,21 +27,30 @@ void matmul_kchains(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     // PTO v0.58 cooperative TMATMUL supports group_M up to 128. A configured
     // tM=256 is therefore materialized as two complete 128-row Shared groups.
     constexpr int kGroupM = tM <= 128 ? tM : 128;
-    constexpr int kPeM = kGroupM <= 64 ? 16 : 32;
     // SharedMatrixLeft physical Rows must be a supported size (64 or 128). When
     // kGroupM is already one of those, the tile is exact; otherwise allocate the
     // next supported size and let ValidRow carry the real cooperative row count.
     constexpr int kTileRows = kGroupM <= 64 ? 64 : 128;
+    // When gM < kTileRows, ValidRow carries the actual row count so TLOAD
+    // only reads gM rows and the M-loop uses a single partial tile.
+    constexpr int kValidRowM = (gM < kTileRows) ? gM : kTileRows;
+    // kPeM follows the effective group_M (kValidRowM), not the physical
+    // kGroupM: when gM < 128 the TMATMUL sees group_M=kValidRowM, so per-PE
+    // rows must match cooperative_group_m_rows_per_pe(kValidRowM).
+    constexpr int kPeM = kValidRowM <= 64 ? 16 : 32;
     constexpr int kKChains = gK / ChainK;
 
-    static_assert(gM % tM == 0, "M must be divisible by tM");
     static_assert(gN % tN == 0, "N must be divisible by tN");
     static_assert(gK % ChainK == 0, "K must be divisible by ChainK");
     static_assert(ChainK > 0, "ChainK must be positive");
     static_assert(tM % kPeNum == 0,
                   "tM must be divisible by the PE count");
-    static_assert(tM % kGroupM == 0 && gM % kGroupM == 0,
-                  "M dimensions must be divisible by group_M");
+    static_assert(tM % kGroupM == 0,
+                  "tM must be divisible by group_M");
+    static_assert(gM % kGroupM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kGroupM or smaller than it");
+    static_assert(gM % kPeM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kPeM, or a partial tile (gM < kGroupM)");
     static_assert(kPeM > 0 && kPeM <= 32,
                   "the PE-local destination supports at most 32 rows");
 
@@ -57,7 +66,7 @@ void matmul_kchains(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     // A chain piece: [group_M, ChainK] (Left, M x Kc). B chain piece:
     // [ChainK, tN] (Right, Kc x N). C: per-PE [kPeM, tN] local accumulator.
     using tileAMatrix =
-        SharedMatrixLeft<dtype, kTileRows, ChainK, kGroupM, ChainK>;
+        SharedMatrixLeft<dtype, kTileRows, ChainK, kValidRowM, ChainK>;
     using tileBMatrix = SharedMatrixRight<dtype, ChainK, tN>;
     using tileAShared = SharedTile<tileAMatrix>;
     using tileBShared = SharedTile<tileBMatrix>;
@@ -76,7 +85,7 @@ void matmul_kchains(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     itB gIterB(b_ptr);
     itC gIterC(c_ptr);
 
-    constexpr int Mb = gM / kGroupM;
+    constexpr int Mb = (gM + kGroupM - 1) / kGroupM;
     constexpr int Nb = gN / tN;
     constexpr int kSharedTRegBytes = 256 * 1024;
     static_assert(tileAMatrix::LogicalTileBytes + tileBMatrix::LogicalTileBytes
@@ -113,9 +122,17 @@ void matmul_kchains(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
             }
 
             // itC advances by the per-PE CUBE row count. Map PE tid to its
-            // row slice in the current [group_M, tN] output block.
-            auto gC = gIterC(i * kPeNum + tid, j);
-            TSTORE_CUBE(gC, tC);
+            // row slice in the current [group_M, tN] output block.  When
+            // gM < kGroupM only the first ceil(gM/kPeM) PEs have valid rows.
+            if constexpr (gM >= kGroupM) {
+                auto gC = gIterC(i * kPeNum + tid, j);
+                TSTORE_CUBE(gC, tC);
+            } else {
+                if ((i * kPeNum + static_cast<int>(tid)) * kPeM < gM) {
+                    auto gC = gIterC(i * kPeNum + tid, j);
+                    TSTORE_CUBE(gC, tC);
+                }
+            }
         }
     }
 }

@@ -29,17 +29,26 @@ template <typename dtype, int gM, int gN, int gK, int tM, int tN, int tK,
 void matmul_shared_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     constexpr int kPeNum = 4;
     constexpr int kGroupM = tM <= 128 ? tM : 128;
-    constexpr int kPeM = kGroupM <= 64 ? 16 : 32;
+    constexpr int kTileRows = kGroupM <= 64 ? 64 : 128;
+    constexpr int kValidRowM = (gM < kTileRows) ? gM : kTileRows;
+    constexpr int kPeM = kValidRowM <= 64 ? 16 : 32;
 
-    static_assert(gM % tM == 0, "M must be divisible by tM");
     static_assert(gN % tN == 0, "N must be divisible by tN");
     static_assert(gK % tK == 0, "K must be divisible by tK");
     static_assert(tM % kPeNum == 0,
                   "tM must be divisible by the PE count");
-    static_assert(tM % kGroupM == 0 && gM % kGroupM == 0,
-                  "M dimensions must be divisible by group_M");
-    static_assert(gM % (blockM * kGroupM) == 0,
-                  "gM must be divisible by blockM * group_M");
+    static_assert(tM % kGroupM == 0,
+                  "tM must be divisible by group_M");
+    static_assert(gM % kGroupM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kGroupM or smaller than it");
+    static_assert(gM % kPeM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kPeM, or a partial tile (gM < kGroupM)");
+    static_assert(gM >= kGroupM || blockM == 1,
+                  "blockM > 1 requires gM >= kGroupM");
+    static_assert(gM % (blockM * kGroupM) == 0 ||
+                  (gM < kGroupM && blockM == 1),
+                  "gM must be divisible by blockM * group_M "
+                  "(or be a single partial tile with blockM=1)");
     static_assert(gN % (blockN * tN) == 0,
                   "gN must be divisible by blockN * tN");
     static_assert(blockM >= 1, "blockM must be at least 1");
@@ -58,7 +67,7 @@ void matmul_shared_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     using gmB = global_tensor<dtype, RowMajor<gN, gK>>;
     using gmC = global_tensor<float, RowMajor<gM, gN>>;
 
-    using tileAMatrix = SharedMatrixLeft<dtype, kGroupM, tK>;
+    using tileAMatrix = SharedMatrixLeft<dtype, kTileRows, tK, kValidRowM, tK>;
     // The current cooperative TMATMUL contract declares a non-transposed
     // Shared B primary in its physical RowMajor [N, K] shape.
     using tileBMatrix = SharedMatrixRight<dtype, tN, tK>;
@@ -85,7 +94,7 @@ void matmul_shared_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     itB gIterB(b_ptr);
     itC gIterC(c_ptr);
 
-    constexpr int Mb = gM / kGroupM;
+    constexpr int Mb = (gM + kGroupM - 1) / kGroupM;
     constexpr int Nb = gN / tN;
     constexpr int Kb = gK / tK;
     constexpr int Mbi = Mb / blockM;
@@ -135,14 +144,24 @@ void matmul_shared_blockM(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
                 }
             }
 
-            // Store blockM * blockN C tiles.
+            // Store blockM * blockN C tiles.  When gM < kGroupM only some
+            // PEs have valid rows in the single partial M-tile.
 #pragma clang loop unroll(full)
             for (int mi = 0; mi < blockM; ++mi) {
 #pragma clang loop unroll(full)
                 for (int nj = 0; nj < blockN; ++nj) {
-                    auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
-                                     bj * blockN + nj);
-                    TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                    if constexpr (gM >= kGroupM) {
+                        auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
+                                         bj * blockN + nj);
+                        TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                    } else {
+                        if (((bi * blockM + mi) * kPeNum +
+                             static_cast<int>(tid)) * kPeM < gM) {
+                            auto gC = gIterC((bi * blockM + mi) * kPeNum + tid,
+                                             bj * blockN + nj);
+                            TSTORE_CUBE(gC, tC[mi * blockN + nj]);
+                        }
+                    }
                 }
             }
         }

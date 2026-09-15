@@ -32,25 +32,33 @@ template <typename dtype, int gM, int gN, int gK, int tM, int tN, int tK>
 void matmul_shared_reuseB(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     constexpr int kPeNum = 4;
     constexpr int kGroupM = tM <= 128 ? tM : 128;
-    constexpr int kPeM = kGroupM <= 64 ? 16 : 32;
+    constexpr int kTileRows = kGroupM <= 64 ? 64 : 128;
+    constexpr int kValidRowM = (gM < kTileRows) ? gM : kTileRows;
+    constexpr int kPeM = kValidRowM <= 64 ? 16 : 32;
 
-    static_assert(gM % tM == 0, "M must be divisible by tM");
     static_assert(gN % tN == 0, "N must be divisible by tN");
     static_assert(gK % tK == 0, "K must be divisible by tK");
     static_assert(tM % kPeNum == 0,
                   "tM must be divisible by the PE count");
-    static_assert(tM % kGroupM == 0 && gM % kGroupM == 0,
-                  "M dimensions must be divisible by group_M");
+    static_assert(tM % kGroupM == 0,
+                  "tM must be divisible by group_M");
+    static_assert(gM % kGroupM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kGroupM or smaller than it");
+    static_assert(gM % kPeM == 0 || gM < kGroupM,
+                  "gM must be a multiple of kPeM, or a partial tile (gM < kGroupM)");
     static_assert(kPeM > 0 && kPeM <= 32,
                   "the PE-local destination supports at most 32 rows");
 
+    // K chain: single=0, begin=raw_acc, middle=raw_acc|acc_hint, end=acc_hint.
+    // C remains explicit; gfsim also needs cube.enable_internal_acc=true.
+    constexpr auto matmulOptions = fixp::keep_acc().transpose_b();
     const uint32_t tid = get_thread_idx();
 
     using gmA = global_tensor<dtype, RowMajor<gM, gK>>;
     using gmB = global_tensor<dtype, RowMajor<gK, gN>>;
     using gmC = global_tensor<float, RowMajor<gM, gN>>;
 
-    using tileAMatrix = SharedMatrixLeft<dtype, kGroupM, tK>;
+    using tileAMatrix = SharedMatrixLeft<dtype, kTileRows, tK, kValidRowM, tK>;
     using tileBMatrix = SharedMatrixRight<dtype, tK, tN>;
     using tileAShared = SharedTile<tileAMatrix>;
     using tileBShared = SharedTile<tileBMatrix>;
@@ -80,7 +88,7 @@ void matmul_shared_reuseB(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
     itB gIterB(b_ptr);
     itC gIterC(c_ptr);
 
-    constexpr int Mb = gM / kGroupM;
+    constexpr int Mb = (gM + kGroupM - 1) / kGroupM;
     constexpr int Nb = gN / tN;
     constexpr int Kb = gK / tK;
     constexpr int kReuseK =
@@ -108,10 +116,14 @@ void matmul_shared_reuseB(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
                         TLOAD<tileBMatrix, 1>(tBReuse[k], gB);
                     }
 
-                    if (k == 0) {
-                        TMATMUL(tC, tAShared, tBReuse[k]);
+                    if constexpr (Kb == 1) {
+                        TMATMUL(tC, tAShared, tBReuse[k], matmulOptions);
+                    } else if (k == 0) {
+                        TMATMUL(tC, tAShared, tBReuse[k], matmulOptions.raw_acc());
+                    } else if (k == Kb - 1) {
+                        TMATMUL_ACC(tC, tC, tAShared, tBReuse[k], matmulOptions.acc_hint());
                     } else {
-                        TMATMUL_ACC(tC, tC, tAShared, tBReuse[k]);
+                        TMATMUL_ACC(tC, tC, tAShared, tBReuse[k], matmulOptions.raw_acc().acc_hint());
                     }
                 }
             }
@@ -127,16 +139,27 @@ void matmul_shared_reuseB(float *c_ptr, dtype *a_ptr, dtype *b_ptr) {
                     auto gB = gIterB(k, j);
                     TLOAD<tileAMatrix, 1>(tAShared, gA);
                     TLOAD<tileBMatrix, 1>(tBShared, gB);
-                    if (k == 0) {
-                        TMATMUL(tC, tAShared, tBShared);
+                    if constexpr (Kb == 1) {
+                        TMATMUL(tC, tAShared, tBShared, matmulOptions);
+                    } else if (k == 0) {
+                        TMATMUL(tC, tAShared, tBShared, matmulOptions.raw_acc());
+                    } else if (k == Kb - 1) {
+                        TMATMUL_ACC(tC, tC, tAShared, tBShared, matmulOptions.acc_hint());
                     } else {
-                        TMATMUL_ACC(tC, tC, tAShared, tBShared);
+                        TMATMUL_ACC(tC, tC, tAShared, tBShared, matmulOptions.raw_acc().acc_hint());
                     }
                 }
             }
 
-            auto gC = gIterC(i * kPeNum + tid, j);
-            TSTORE_CUBE(gC, tC);
+            if constexpr (gM >= kGroupM) {
+                auto gC = gIterC(i * kPeNum + tid, j);
+                TSTORE_CUBE(gC, tC);
+            } else {
+                if ((i * kPeNum + static_cast<int>(tid)) * kPeM < gM) {
+                    auto gC = gIterC(i * kPeNum + tid, j);
+                    TSTORE_CUBE(gC, tC);
+                }
+            }
         }
     }
 }

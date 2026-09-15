@@ -85,8 +85,8 @@ void flash_attention_fixpipe_impl(
                   "cooperative group_M must be in the range 1..128");
 
     // GM tensors. Q/V/O are RowMajor in their natural [rows, cols] orientation.
-    // K is physically [Skv, qD] row-major (head dim contiguous), described as
-    // RowMajor<Skv, qD> so the CUBE reads K^T without a transpose_b flag.
+    // K is physically [Skv, qD] row-major (head dim contiguous). The K tile
+    // stores K^T [qD, kTk]; transpose_b tells TMATMUL to read it as [K=qD, N=kTk].
     using gmQ = global_tensor<matrix_dtype, RowMajor<Sq, kStoredQD>>;
     using gmK = global_tensor<matrix_dtype, RowMajor<Skv, kStoredQD>>;
     using gmV = global_tensor<matrix_dtype, RowMajor<kStoredSkv, vD>>;
@@ -180,7 +180,7 @@ void flash_attention_fixpipe_impl(
             // post-processing feature (B.FPATR RowMaxEn).  tLocalMax
             // receives the row-wise max of the UNSCALED accumulator.
             tileMax tLocalMax;
-            auto qkOptions = fixp::keep_acc().row_max(tLocalMax);
+            auto qkOptions = fixp::keep_acc().row_max(tLocalMax).transpose_b();
             TMATMUL(tW, tQ, tK, qkOptions);
 
             // Scale both score and row_max (row_max output is unscaled).

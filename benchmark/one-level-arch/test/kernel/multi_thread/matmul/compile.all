@@ -167,3 +167,28 @@ make diss TESTCASE=matmul_lowp_blockM LP_MODE=MXFP4 \
 # gfsim limit).  Demonstrates A-shared-across-N at production scale.
 make diss TESTCASE=matmul_blockM COMPILER_DIR="$COMPILER_DIR" \
     DTYPE=float B=1 M=2048 N=256 K=2048 tM=128 tN=128 tK=64 BLOCKN=2
+
+# === Fused matmul -> block quantize -> (data + scale) ===
+# Phase 1 reuses the cooperative SharedTile matmul to write FP32 C to a
+# scratch buffer; Phase 2 SPMD-quantises it in 32-row tiles (group-32 MX:
+# amax -> E8M0 scale -> reciprocal -> scale-mul -> encode). N=64 gives two
+# 32-wide blocks per row -- one TASSEMBLY pair on the assemble path.
+#   USE_ASSEMBLE=1: pack two bf16 halves via TASSEMBLY (lowers to
+#     B.ASSEMBLE). gfrun (functional) models B.ASSEMBLE and passes; gfsim
+#     (timing) does not model it, so this path is not gfsim-runnable.
+#   USE_ASSEMBLE=0: strided half stores. Both gfrun- and gfsim-runnable.
+# Minimal config: M=128 N=64 K=256, tM=128 tN=64 tK=128 (FP32, Kb=2).
+make diss TESTCASE=matmul_quantize QUANT_MODE=FP8 USE_ASSEMBLE=1 \
+    COMPILER_DIR="$COMPILER_DIR" \
+    DTYPE=float B=1 M=128 N=64 K=256 tM=128 tN=64 tK=128
+
+make diss TESTCASE=matmul_quantize QUANT_MODE=FP8 USE_ASSEMBLE=0 \
+    COMPILER_DIR="$COMPILER_DIR" \
+    DTYPE=float B=1 M=128 N=64 K=256 tM=128 tN=64 tK=128
+
+# === Fused matmul -> level-1 HiF4 (S1P2 data + E6M2 scale) ===
+# Per row, every 64 C columns share one E6M2 scale. The two scaled 32-column
+# halves are packed with TileArray/TASSEMBLY before BF16 -> HiF4X2 TCVT.
+make diss TESTCASE=matmul_hif4_l1_quantize \
+    COMPILER_DIR="$COMPILER_DIR" \
+    DTYPE=float B=1 M=128 N=64 K=256 tM=128 tN=64 tK=128

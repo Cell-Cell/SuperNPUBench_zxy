@@ -234,7 +234,7 @@ void flash_attention_2d_unroll_shared_impl(
             auto gK = gIterK(0, j);
             TLOAD<tileKMatrix, 1>(tK, gK);
 
-            auto qkOptions = fixp::keep_acc();
+            auto qkOptions = fixp::keep_acc().transpose_b();
             TMATMUL(tW, tQ, tK, qkOptions);
 
             // Scale
