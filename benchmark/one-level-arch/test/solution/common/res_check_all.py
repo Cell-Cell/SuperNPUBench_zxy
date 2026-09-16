@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Prepare inputs, run four-PE RES_CHECK ELFs, and compare with NumPy — solution 树版。
 
-与 test/kernel/multi_thread/res_check_all.py **对称**：同一套 host-golden 范式
+与 test/kernel/res_check_all.py **对称**：同一套 host-golden 范式
 （kernel 只做二进制 I/O：读 CHK_DIR/input.bin、写 CHK_DIR/output.bin；host 侧用 numpy
 造 golden 并比对），同一套 CLI 与 stdout 输出格式，供上层统一接入。
 
 差别（solution 树特性）：
-  1. ROOT/OUTPUT 指向 output/solution（非 output/kernel/multi_thread）。
+  1. ROOT/OUTPUT 指向 output/solution（非 output/kernel）。
   2. **自包含编译**：main 跑 CASES 前，对 CASES 涉及算子目录注入 `res_check=on` 编译。
   3. Case 支持两类算子（见下）：
      - **单输出 + numpy golden**（如 rms_norm）：给 `prepare` 写 input.bin + 返回 golden，

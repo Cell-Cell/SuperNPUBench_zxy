@@ -2,30 +2,30 @@
 
 Header-only PTO operator implementations, organized by execution model:
 
-- [`multi_thread/`](multi_thread/README.md): four-PE kernels. Each operator
+- [`basic_op/`](basic_op/README.md): four-PE kernels. Each operator
   directory holds the four-PE wrapper plus the single-PE base implementation it
   partitions, the latter under `<op>/detail/`. Shared helpers live in
-  `multi_thread/utils/`.
+  `basic_op/utils/`.
 - [`solution/`](../test/solution): fused / end-to-end operator solutions built
   on top of the kernel primitives.
 
-## multi_thread/ operators
+## basic_op/ operators
 
 | Operator | Directory |
 |---|---|
-| Broadcast | `multi_thread/broadcast/` |
-| Concat (gather / scatter) | `multi_thread/concat/` |
-| 1x1 Conv2D | `multi_thread/conv2d/` |
-| GELU / TADD | `multi_thread/element_wise/` |
-| FlashAttention | `multi_thread/fa/` |
-| Gather | `multi_thread/gather/` |
-| Shared / low-precision Matmul | `multi_thread/matmul/` |
-| MX-quantized Matmul | `multi_thread/mxquant/` |
-| Row Cumsum / Max / Prod / Sum | `multi_thread/reduction/` |
-| 2D Transpose | `multi_thread/transpose/` |
-| SPMD partition / layout helpers | `multi_thread/utils/` |
+| Broadcast | `basic_op/broadcast/` |
+| Concat (gather / scatter) | `basic_op/concat/` |
+| 1x1 Conv2D | `basic_op/conv2d/` |
+| GELU / TADD | `basic_op/element_wise/` |
+| FlashAttention | `basic_op/fa/` |
+| Gather | `basic_op/gather/` |
+| Shared / low-precision Matmul | `basic_op/matmul/` |
+| MX-quantized Matmul | `basic_op/mxquant/` |
+| Row Cumsum / Max / Prod / Sum | `basic_op/reduction/` |
+| 2D Transpose | `basic_op/transpose/` |
+| SPMD partition / layout helpers | `basic_op/utils/` |
 
-See [`multi_thread/README.md`](multi_thread/README.md) for the partition rules,
+See [`basic_op/README.md`](basic_op/README.md) for the partition rules,
 the base/wrapper split, and the gfrun + RES_CHECK regression status.
 
 ## solution/ operators
@@ -43,7 +43,7 @@ the base/wrapper split, and the gfrun + RES_CHECK regression status.
 ## Usage
 
 ```cpp
-#include "multi_thread/matmul/matmul_shared.hpp"
+#include "basic_op/matmul/matmul_shared.hpp"
 matmul_shared<float, gM, gN, gK, tM, tN, tK>(c_ptr, a_ptr, b_ptr);
 ```
 

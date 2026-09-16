@@ -161,7 +161,7 @@ export COMPILER_DIR=/path/to/linx_blockisa_llvm_musl/bin
 
 ```bash
 # one-level-arch (PTO ISA) — multi-thread operator
-cd benchmark/one-level-arch/test/kernel/multi_thread/matmul
+cd benchmark/one-level-arch/test/kernel/matmul
 make TESTCASE=matmul COMPILER_DIR="$COMPILER_DIR" B=1 M=256 N=256 K=256 tM=32 tN=32 tK=32
 ```
 

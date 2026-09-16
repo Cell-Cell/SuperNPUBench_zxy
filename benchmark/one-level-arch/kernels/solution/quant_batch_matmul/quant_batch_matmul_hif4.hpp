@@ -2,7 +2,7 @@
 #define QUANT_BATCH_MATMUL_E1M2_KERNEL_HPP
 
 #include <common/pto_tileop.hpp>
-#include "multi_thread/matmul/matmul_mx.hpp"
+#include "basic_op/matmul/matmul_mx.hpp"
 
 // ============================================================================
 // quant_batch_matmul_e1m2 — e1m2x2 fp4 多 block MX matmul (e8m0/group-32)
