@@ -26,13 +26,10 @@ using namespace pto;
 //  10. Loop-invariant ops hoisted: qkOptions/pvOptions outside both loops,
 //      Q load outside Kb loop (Q depends on i, not j).
 //
-// PTO v0.58: SharedMatrixRight without transpose_b maps BValidRows to
-// ValidCol (N), causing AValidCols(qD) != BValidRows(kTk) when kTk != qD.
-// transpose_b() flips this so BValidRows = ValidRow (K = qD), matching A
-// for any kTk.  The K tile stores K^T [qD, kTk] data; transpose_b tells
-// TMATMUL to read it as [K=qD, N=kTk], which is the correct QK^T shape.
-// PV likewise needs transpose_b: V tile [kTk, vD] must be read as
-// [K=kTk, N=vD].
+// Shared B declares its physical RowMajor shape: without transpose_b it is
+// [N, K], while with transpose_b it is [K, N]. K is loaded in its natural
+// [kTk, qD] = [N, K] order for QK^T, so QK does not set transpose_b.
+// V is loaded in its natural [kTk, vD] = [K, N] order, so PV does set it.
 
 // Convert two logical scalar columns into one packed-x2 cube element.
 template <is_tile_data_v tile_shape_out, is_tile_data_v tile_shape_in>
@@ -73,8 +70,7 @@ void flash_attention_2d_unroll_shared_impl(
     constexpr int kPeTm = kGroupM <= 64 ? 16 : 32;
     // Change 1: physical Rows must be 128 or 64; ValidRow = actual kGroupM.
     constexpr int kTileRows = (kGroupM <= 64) ? 64 : 128;
-    // Change 2: chunk sizes = full K dimension (no 32 KB per-row chunking).
-    constexpr int kQKStoredChunk = kStoredQD;
+    // Change 2: QK uses the full head dimension (no K chunking).
     constexpr int kPVStoredChunk = kStoredTk;
     static_assert(kTm % kGroupM == 0 && Sq % kGroupM == 0,
                   "Tm and Sq must be divisible by cooperative group_M");
@@ -85,9 +81,8 @@ void flash_attention_2d_unroll_shared_impl(
     static_assert(kGroupM >= 1 && kGroupM <= 128,
                   "cooperative group_M must be in the range 1..128");
 
-    // GM tensors. Q/V/O are RowMajor in their natural [rows, cols] orientation.
-    // K is physically [Skv, qD] row-major (head dim contiguous), described as
-    // RowMajor<Skv, qD> so the CUBE reads K^T without a transpose_b flag.
+    // GM tensors are RowMajor in their natural [rows, cols] orientation.
+    // K is [Skv, qD] with the head dimension contiguous.
     using gmQ = global_tensor<matrix_dtype, RowMajor<Sq, kStoredQD>>;
     using gmK = global_tensor<matrix_dtype, RowMajor<Skv, kStoredQD>>;
     using gmV = global_tensor<matrix_dtype, RowMajor<kStoredSkv, vD>>;
@@ -96,11 +91,12 @@ void flash_attention_2d_unroll_shared_impl(
     // Change 1: SharedMatrixLeft uses kTileRows (128/64) for physical Rows,
     // kGroupM for ValidRow.
     using tileQMatrix =
-        SharedMatrixLeft<matrix_dtype, kTileRows, kQKStoredChunk,
-                         kGroupM, kQKStoredChunk>;
-    // K tile [kQKStoredChunk, kTk] — K^T shape, no transpose_b needed.
+        SharedMatrixLeft<matrix_dtype, kTileRows, kStoredQD,
+                         kGroupM, kStoredQD>;
+    // K tile is physically [N=kTk, K=qD/PackedFactor]. Shared B without
+    // transpose_b interprets this as the right operand of QK^T.
     using tileKMatrix =
-        SharedMatrixRight<matrix_dtype, kQKStoredChunk, kTk>;
+        SharedMatrixRight<matrix_dtype, kTk, kStoredQD>;
     // V tile [kPVStoredChunk, vD] — natural [K, N] right-operand shape.
     using tileVMatrix =
         SharedMatrixRight<matrix_dtype, kPVStoredChunk, vD>;
@@ -178,7 +174,7 @@ void flash_attention_2d_unroll_shared_impl(
     constexpr int Kb = (Skv + kTk - 1) / kTk;
 
     // Loop-invariant fixpipe options — hoisted outside both loops.
-    constexpr auto qkOptions = fixp::keep_acc().transpose_b();
+    constexpr auto qkOptions = fixp::keep_acc();
     constexpr auto pvOptions = fixp::keep_acc().transpose_b();
 
 #pragma clang loop unroll(full)
@@ -200,7 +196,7 @@ void flash_attention_2d_unroll_shared_impl(
 
             // --- QK matmul ---
             tileK tK;
-            auto gK = gIterK(0, j);
+            auto gK = gIterK(j, 0);
             TLOAD<tileKMatrix, 1>(tK, gK);
 
             TMATMUL(tW, tQ, tK, qkOptions);

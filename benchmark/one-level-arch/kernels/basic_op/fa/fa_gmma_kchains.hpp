@@ -67,14 +67,14 @@ void flash_attention_gmma_kchains_impl(
     using GmO = global_tensor<VectorDType, RowMajor<Sq, vD>>;
 
     // Q is [M,qD], K is [Tk,qD]; QK does not split the head dimension.
-    // storage. Shared B with TransB=0 consumes this physical [N,K] as K^T.
+    // Shared B with TransB=0 declares this physical [N,K] storage.
     using TileQMatrix =
         SharedMatrixLeft<MatrixDType, kTileRows, kStoredQD,
                          kGroupM, kStoredQD>;
     using TileKMatrix =
         SharedMatrixRight<MatrixDType, kTk, kStoredQD>;
     using TileVMatrix =
-        SharedMatrixRight<MatrixDType, kStoredChainK, vD>;
+        SharedMatrixRight<MatrixDType, vD, kStoredChainK>;
     using TileQ = SharedTile<TileQMatrix>;
     using TileK = SharedTile<TileKMatrix>;
     using TileV = SharedTile<TileVMatrix>;
@@ -139,8 +139,11 @@ void flash_attention_gmma_kchains_impl(
     const float scale = 1.0f / sqrt(static_cast<float>(scaleD));
     constexpr int kQBlocks = Sq / kGroupM;
     constexpr int kKVBlocks = (Skv + kTk - 1) / kTk;
-    // V is physically [K,N], so Shared B requires TransB=1 for PV.
-    constexpr auto pvOptions = fixp::keep_acc().transpose_b();
+    // PTO/TileOP Shared-B storage contract:
+    //   TransB=0 declares physical [N,K]; TransB=1 declares physical [K,N].
+    // K is stored [N=Tk,K=qD], while V is stored [K=PVChainK,N=vD].
+    constexpr auto qkOptions = fixp::keep_acc();
+    constexpr auto pvOptions = fixp::keep_acc();
 
 #pragma clang loop unroll(full)
     for (int i = 0; i < kQBlocks; ++i) {
@@ -160,7 +163,7 @@ void flash_attention_gmma_kchains_impl(
             auto gK = gIterK(j, 0);
             TLOAD<TileQMatrix, 1>(tQ, gQ);
             TLOAD<TileKMatrix, 1>(tK, gK);
-            TMATMUL(tW, tQ, tK, fixp::keep_acc());
+            TMATMUL(tW, tQ, tK, qkOptions);
 
             TMULS(tW, tW, scale);
 
