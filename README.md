@@ -405,6 +405,7 @@ microbench（one-level 金标准比对几乎全过）。**与精度容差无关*
 
 
 > **当前验证基线**：2026-09-16（580 个已编译 ELF 全量 gfrun 复测，**HIF4/HIF8 首次纳入**）；
+> ISA 规范对应 **pto-spec `main` `86f46079`（PTO v0.58.6 + 已接受修正案，含 #311 CUBE reduction geometry）**；
 > gfrun `feat/gfrun-pto-311-cube-reduction-geometry` `10dd099f`→`b00ed95c`（model Local B.ASSEMBLE
 > parent references，HIF4/HIF8 18 ELF 解锁）；fa_2d_unroll_gmma/fa_gmma_kchains **Shared-B TransB
 > 存储契约修正**（`1f4425d`，QK/PV 不再误用 transpose_b），fa 32/32 PASS；
@@ -418,13 +419,14 @@ microbench（one-level 金标准比对几乎全过）。**与精度容差无关*
 
 | 组件 | 分支/版本 | Commit |
 |---|---|---|
+| PTO ISA 规范 / pto-spec | `main`（v0.58.6 + 已接受修正案） | `86f46079` |
 | gfrun / SuperScalarModel-asl | `feat/gfrun-pto-311-cube-reduction-geometry` | `b00ed95c` |
 | llvm-project | `dev-llvm15_56` | `1037cc1cd` |
 | Linx-TileOP-API | `fix/issue-138-reduction-prefix-subview` | `697f5d8` |
 | linx-toolchain-build | `main` | `e6a31ef` |
 | SuperNPUBench | `main` | `1f4425d` |
 
-编译器按 **AGENTS.md** 指定用主 `linx-toolchain-build` worktree：clang 15.0.4（clang hash `1037cc1cd31c80e5493ffd7851f7b35a2f8dd79c`），target `linx64v5-unknown-linux-musl`，PTO **v0.58.6**。gfrun 用 **SuperScalarModel-asl worktree**（`feat/gfrun-pto-311-cube-reduction-geometry` `b00ed95c`，较 09-15 新增 `fix(gfrun): model Local B.ASSEMBLE parent references`）。fa_2d_unroll_gmma 使用 TREDUCEPREFIXVIEW 零拷贝行归约 prefix view + **Shared-B TransB 契约修正**（K 以自然 [N,K] 存储时 QK 不设 transpose_b）。执行：`gfrun -t 1 -f <elf>`，kernel 算子加 `-s softcore.multiThreadNum=4`，单 ELF 420s 超时 + **2GB 输出截断**。PASS = `Reach the End of Benchmark` + `R2 = 0`（tail-based 检测，最后 64KB）。**HIF4/HIF8 首次纳入**（gfrun B.ASSEMBLE 支持）。
+编译器按 **AGENTS.md** 指定用主 `linx-toolchain-build` worktree：clang 15.0.4（clang hash `1037cc1cd31c80e5493ffd7851f7b35a2f8dd79c`），target `linx64v5-unknown-linux-musl`。ISA 规范对应 **PTO v0.58.6 + 已接受修正案**：pto-spec `main` `86f46079`（`specification.toml` `architecture_version = 0.58.6`，v0.58.6.0 发布点后 27 个已接受修正提交，含 **PTO #311 CUBE reduction geometry**——gfrun `feat/gfrun-pto-311-cube-reduction-geometry` 分支与 TileOP `697f5d8` zero-copy reduction prefix views 的规范依据；另有 #291 Local layout 统一、#308 32-bit BSTART CALL 形式、#310 CUBE_M16/M32 2D TCI 形式等）。TileOP-API `697f5d8` = `linxisa-v0.58.0-183-g697f5d8`。gfrun 用 **SuperScalarModel-asl worktree**（`feat/gfrun-pto-311-cube-reduction-geometry` `b00ed95c`，较 09-15 新增 `fix(gfrun): model Local B.ASSEMBLE parent references`）。fa_2d_unroll_gmma 使用 TREDUCEPREFIXVIEW 零拷贝行归约 prefix view + **Shared-B TransB 契约修正**（K 以自然 [N,K] 存储时 QK 不设 transpose_b）。执行：`gfrun -t 1 -f <elf>`，kernel 算子加 `-s softcore.multiThreadNum=4`，单 ELF 420s 超时 + **2GB 输出截断**。PASS = `Reach the End of Benchmark` + `R2 = 0`（tail-based 检测，最后 64KB）。**HIF4/HIF8 首次纳入**（gfrun B.ASSEMBLE 支持）。
 
 ## 关键变更（09-15→09-16）
 
@@ -527,7 +529,7 @@ microbench（one-level 金标准比对几乎全过）。**与精度容差无关*
 
 | 日期 | gfrun (SuperScalarModel) | llvm / TileOP-API | 工具链 | ELF | PASS | FAIL | T/O | 通过率 | 关键变化 |
 |---|---|---|---|---:|---:|---:|---:|---:|---|
-| 09-16 | asl `feat/gfrun-pto-311-cube-reduction-geometry` `b00ed95c` | `1037cc1cd` / `697f5d8` | AGENTS.md 主 worktree（PTO v0.58.6） | 580 | 483 | 97 | 0 | 83.3% | gfrun B.ASSEMBLE 支持（b00ed95c）→ HIF4/HIF8 18 ELF 首次纳入（7 PASS）；fa Shared-B TransB 契约修正（1f4425d）fa 32/32 PASS 零回归；单线程套件退役（−31 ELF，重构 79e492a）；matmul_quantize_FP8_ASM1 被 B.ASSEMBLE 检查拦截（PASS→FAIL）；concat_scatter 420s 直接 PASS |
+| 09-16 | asl `feat/gfrun-pto-311-cube-reduction-geometry` `b00ed95c`；pto-spec `86f46079`（v0.58.6+修正案） | `1037cc1cd` / `697f5d8` | AGENTS.md 主 worktree（PTO v0.58.6 + 已接受修正案） | 580 | 483 | 97 | 0 | 83.3% | gfrun B.ASSEMBLE 支持（b00ed95c）→ HIF4/HIF8 18 ELF 首次纳入（7 PASS）；fa Shared-B TransB 契约修正（1f4425d）fa 32/32 PASS 零回归；单线程套件退役（−31 ELF，重构 79e492a）；matmul_quantize_FP8_ASM1 被 B.ASSEMBLE 检查拦截（PASS→FAIL）；concat_scatter 420s 直接 PASS |
 | 09-15 | asl `feat/gfrun-pto-311-cube-reduction-geometry` `10dd099f` | `1037cc1cd` / `697f5d8` | AGENTS.md 主 worktree（PTO v0.58.6） | 593 | 500 | 93 | 0 | 84.3% | gfrun 分支切换（PTO #311 CUBE reduction geometry + binary reduction-prefix subview 修复）；TileOP fix/issue-138-reduction-prefix-subview；fa_2d_unroll_gmma TCVT→TREDUCEPREFIXVIEW 零拷贝行归约；validCol TSTORE 28→1 FAIL（gfrun 修复）；fa_fixpipe 新增 24 FAIL（PTO #311 destinationShape）+ fa_subview 20 FAIL（TROWMAX）；mt/fa compile.all 扩展 38→71 ELF（+fa_gmma_kchains ×2）；normalization +8（全 PASS）；dynamic_mx_quant 移除（−14）；reduction 4→0 FAIL；fixp 16→12 FAIL |
 | 09-14 | asl `fix/gfrun-shared-tmatmul-layout-257` `ad972d21` | `4a3e0bdb5` / `987d034` | AGENTS.md 主 worktree（PTO v0.58.6） | 579 | 486 | 93 | 0 | 83.9% | gfrun 分支切换（Shared TMATMUL layout）；TileOP 加严矩阵 shape 校验→单线程 fa/matmul 19 ELF 编译失败；新增 fa_gmma_kchains(+2)、matmul_blockM/kchains/lowp(+19)、dynamic_mx_quant(+14)；gather_v2/view_copy 回归 R2=1(−6 PASS)；输出截断 500MB→2GB；compile.all set -euo→set -u |
 | 09-11 | asl `codex/gfrun-pto-0586-asl` `e7d883c9` | `0a141cbd2` / `e93ef98` | AGENTS.md 主 worktree（PTO v0.58.6） | 569 | 487 | 82 | 0 | 85.6% | 编译器更新（llvm B.DATR CCTRL 消歧 + TileOP reinterpret_tile）；全量重编译 584 ELF；fixp +2 PASS（18→16 FAIL）；新增 solution matmul_test ×3（FAIL）；dynamic_mx_quant compile FAIL；A16W4 matmul ×3 全部独立验证 PASS（1.07–1.36GB）；group_token_old_mt 独立验证 PASS |
