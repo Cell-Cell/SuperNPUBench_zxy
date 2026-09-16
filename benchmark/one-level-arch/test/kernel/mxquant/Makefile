@@ -1,19 +1,16 @@
-# Multi-thread MX quantization (OCP MX v1.0 section 6.3) operators.
+# Multi-thread MX quantization (OCP MX v1.0 section 6.3): one [512, 256] BF16
+# tensor quantized to E4M3 payload plus group-32 E8M0 scales, in CUBE_M32
+# layout.  The four PEs slice the tensor by M via get_thread_idx().
 #
-# Three variants share one kernel contract: a [128, kCols] BF16 tensor is
-# quantized to E4M3 payload plus group-32 E8M0 scales, and each kernel slices
-# the tensor by M across four PEs via get_thread_idx().
+# |x| is folded as CUBE-aware max(x, -x) instead of TABS (see
+# kernels/basic_op/mxquant/mxquant.hpp and LinxISA/SuperScalarModel issue
+# #678).  The kernel is TLSU bound until contiguous load + subview + assemble
+# land.
 #
-#   mxquant                  kCols=64,   two strided half-blocks
-#   mxquant_1024_assembly    kCols=1024, 8-block batches (higher tile pressure)
-#   mxquant_1024_streaming   kCols=1024, one block at a time (~5 KB peak)
+# TESTCASE is the source basename: the `clean` rule in Makefile.common only
+# removes ${TESTCASE}.o, and there is no header dependency tracking.
 #
-# TESTCASE selects the variant and is deliberately the source basename: the
-# `clean` rule in Makefile.common only removes ${TESTCASE}.o, so a per-variant
-# TESTCASE is what keeps a rebuild from silently relinking another variant's
-# stale object (there is no header dependency tracking).
-#
-# Run every variant with four PEs, e.g.
+# Run with four PEs, e.g.
 #   gfrun -s softcore.multiThreadNum=4 -f <elf>
 #
 # res_check=on builds the verifying variant: PE0 reads input.bin from CHK_DIR,
@@ -23,18 +20,7 @@
 
 TESTCASE ?= mxquant
 
-ifeq ($(TESTCASE),mxquant)
 SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant.cpp
 TARGET = $(ELF_HEAD)_mxquant_PE4.elf
-else ifeq ($(TESTCASE),mxquant_1024_assembly)
-SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant_1024_assembly.cpp
-TARGET = $(ELF_HEAD)_mxquant_1024_assembly_PE4.elf
-else ifeq ($(TESTCASE),mxquant_1024_streaming)
-SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant_1024_streaming.cpp
-TARGET = $(ELF_HEAD)_mxquant_1024_streaming_PE4.elf
-else
-$(error Unsupported TESTCASE=$(TESTCASE); expected mxquant, \
-mxquant_1024_assembly, or mxquant_1024_streaming)
-endif
 
 include ../../common/Makefile.common

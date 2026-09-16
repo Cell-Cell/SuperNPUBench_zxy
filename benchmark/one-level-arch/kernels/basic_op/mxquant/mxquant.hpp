@@ -3,114 +3,87 @@
 #include <common/pto_tileop.hpp>
 #include <cstdint>
 
-// MXQuant: BF16[32,64] -> E4M3[32,64] + E8M0[32,2].
+// MXQuant [512,256] BF16 -> E4M3[512,256] + E8M0[512,8], CUBE_M32 layout.
 //
-// Each row is split into two 32-wide MX blocks.  Per block g:
+// One operator, one shape: the four PEs split M (512 -> 128 rows each), and
+// within a PE a 32-row block is quantized one 32-wide MX group at a time (8
+// groups per block, 4 blocks per PE).
 //
-//   amax[g]       = rowmax(abs(X[:, g*32 : g*32+32]))      // BF16[32,1]
-//   scale[g]      = MX_E8M0(amax[g])                       // covers QMAX=448
-//   Q[:, block g] = E4M3_RNE_SAT(X[:, block g] * (1/scale[g]))
+// |x| is folded as max(x, -x) rather than TABS.  On the current gfrun a unary
+// TEPL op writes its CUBE_M32 destination densely instead of through the CELL
+// indexer, which permutes the [32,32] tile (see LinxISA/SuperScalarModel issue
+// #678).  TSUB/TMAX are CUBE-cell aware and max(x, -x) is bit-exact for every
+// input, so the scale/quant result is identical to an abs-based one.
 //
-// The two blocks arrive as separate [32,32] tiles (the test loads them with
-// two strided TLOADs).  The scaled halves are encoded to E4M3 independently
-// and stored back with two strided TSTOREs; a TASSEMBLY variant that packs
-// them into one [32,64] tile first is kept disabled below (gfsim does not
-// model B.ASSEMBLE; TPARTVIEW subview sources are only modelled for CUBE
-// layouts, so RowMajor operands use materialized tiles instead).
+// The scale output is packed along N: the eight per-group E8M0 columns of a
+// row block are TPACKed four-at-a-time into two U32 words per row, so each
+// row block costs TWO 128 B scale stores (full CELLs) instead of eight
+// 1/4-full ones.  The byte order is still plain row-major [512,8]
+// (scale(row, group) = scales[row*8 + group]).
 //
-// Two ISA representation rules shape the helper types below:
-//   - TROWMAX/TROWEXPANDMUL require their reduction result / broadcast
-//     operand to be exactly N x 1, hence RowMaxTile.
-//   - Ordinary TCVT requires equal capacity-derived physical rows and equal
-//     ValidRow/ValidCol on both sides.  A narrow BF16<->E8M0 pair therefore
-//     carries the single scale column in a [32,2] byte tile with ValidCol=1
-//     (ScaleTile); see the TCVT legality note in template_asm.hpp.
+// No subview is used: each 32-wide group is TLOADed/TSTOREd with its own
+// strided view into the [32,256] row block (the same trick the earlier
+// half-block kernel used, generalised to eight columns).  Because the payload
+// move is 64 B bursts at a 512 B stride (< the 256 B cacheline) this kernel is
+// TLSU bound; the contiguous-load + TPARTVIEW + TASSEMBLY form that would fix
+// it is blocked on the missing subview/assemble support (see the disabled
+// variant at the bottom).
 
 namespace mxquant {
 
 using namespace pto;
 
-constexpr int kTotalRows = 128;          // Complete tensor: 4 PE × 32
-constexpr int kRows = 32;                // Rows per PE
-constexpr int kCols = 64;
-constexpr int kBlock = 32;
-constexpr int kBlocksPerRow = kCols / kBlock;
-constexpr int kE4M3Max = 448;
+constexpr int kTotalRows = 512;                       // complete tensor rows
+constexpr int kRows = 32;                             // M32 tile rows
+constexpr int kCols = 256;                            // complete tensor columns
+constexpr int kBlock = 32;                            // MX group width
+constexpr int kPeCount = 4;
+constexpr int kRowsPerPe = kTotalRows / kPeCount;     // 128
+constexpr int kRowBlocks = kRowsPerPe / kRows;        // 4 blocks of 32 rows
+constexpr int kBlocksPerRow = kCols / kBlock;         // 8 MX groups per row
+constexpr int kPackedWords = kBlocksPerRow / 4;       // 2 U32 words per row
+constexpr int kE4M3Max = 448;                         // E4M3 max finite value
 
-// Layout note: Vec + CubeM32 (VecTileM32) was tried and reverted — the API
-// rejects CubeM16/M32 fractals as TCVT operands unless the tile has a Matrix
-// location (template_asm.hpp "TCVT CUBE_M16/M32 destination must have Matrix
-// location"), so Vec M32 tiles can only be TLOADed/TSTOREd, not converted.
-// Until the API supports Vec-side M32 TCVT, compute tiles stay RowMajor.
-using InputTile = Tile<Location::Vec, __bf16, kRows, kCols, BLayout::RowMajor>;
-using BlockTile = Tile<Location::Vec, __bf16, kRows, kBlock, BLayout::RowMajor>;
-using RowMaxTile = Tile<Location::Vec, __bf16, kRows, 1, BLayout::RowMajor>;
-// The RTM amax -> E8M0 convert below is written as FP16 -> E8M0, so the BF16
-// row max is widened first.  BF16->FP16 is an exact widening for this
-// kernel's amplitude range.  (Narrowing this to a direct BF16 -> E8M0 RTM
-// convert would drop one TCVT, but that source/dest pair is unverified
-// against the model.)
-using Fp16RowMaxTile = Tile<Location::Vec, __half, kRows, 1, BLayout::RowMajor>;
-using QuantizedTile =
-    Tile<Location::Vec, __fp8_e4m3, kRows, kCols, BLayout::RowMajor>;
-// One quantized MX block; run() stores the halves with strided TSTOREs
-// (gfsim does not model B.ASSEMBLE).
-using QuantBlockTile =
-    Tile<Location::Vec, __fp8_e4m3, kRows, kBlock, BLayout::RowMajor>;
+static_assert(kTotalRows % (kPeCount * kRows) == 0,
+              "M must split into whole 32-row blocks per PE");
+static_assert(kBlocksPerRow == 8, "this shape packs eight groups per row");
+static_assert(kE4M3Max == 448, "this profile uses the E4M3 max finite value");
 
-// One E8M0 scale column per MX block.  Stored as [32,2] with ValidCol=1 so
-// BF16<->E8M0 TCVT keeps matching capacity-derived rows; TSTORE writes only
-// the valid column, so the GM layout stays the compact [32,2] form.
-using ScaleTile =
-    Tile<Location::Vec, __fp8_e8m0, kRows, 2, BLayout::RowMajor, kRows, 1>;
-
-// Same geometry and bytes as ScaleTile, but a native uint8_t tile: this is the
-// carrier the E8M0 exponent codes actually live in while they are being
-// manipulated as raw bytes (TSUBS/TSUB/TEXPANDS) and when they are stored.
-//
-// It has to be a real u8 tile rather than a reinterpret_tile view of a
-// ScaleTile, for two reasons:
-//   - TSUBS(dst, src, s) binds dst and src to one template parameter, so a
-//     native tile and a view of it are different types and will not bind.
-//   - The model tags each Tile register with the dtype of the block that last
-//     wrote it.  A byte-domain write leaves the register tagged UINT8, and
-//     ValidateLocalTlsu (AccumulateBlockInfo.cpp:190) requires a non-CUBE
-//     TSTORE's block dtype to equal that tag -- so the store must be a u8
-//     store.  reinterpret_tile cannot fix this at the store: it is a
-//     zero-instruction compile-time view, so it never re-tags the register,
-//     and its view type does not expose IsCubeLayout, which TSTORE requires.
-// E8M0 and uint8_t are both 8 bit and TSTORE does not convert, so the bytes
-// landing in GM are identical either way.
-using ScaleCodeTile =
-    Tile<Location::Vec, uint8_t, kRows, 2, BLayout::RowMajor, kRows, 1>;
+using BlockTile = VecTileM32<__bf16, kRows, kBlock>;
+using RowMaxTile = VecTileM32<__bf16, kRows, 1>;
+using Fp16RowMaxTile = VecTileM32<__half, kRows, 1>;
+using QuantBlockTile = VecTileM32<__fp8_e4m3, kRows, kBlock>;
+using ScaleTile = VecTileM32<__fp8_e8m0, kRows, 4, kRows, 1>;
+using ScaleCodeTile = VecTileM32<uint8_t, kRows, 4, kRows, 1>;
 
 static_assert(ScaleCodeTile::TilesizeCode == ScaleTile::TilesizeCode,
               "the u8 scale carrier must occupy the same Tile capacity as the "
               "E8M0 view of it");
-
-static_assert(kCols % kBlock == 0, "MX block must divide the input width");
-static_assert(kE4M3Max == 448, "this profile uses the E4M3 max finite value");
 static_assert(RowMaxTile::ValidCol == 1 && RowMaxTile::Cols == 1,
               "TROWMAX reduction result must be logical N x 1");
 
+// One E8M0 scale column per MX block, carried in a [kRows, 4] byte tile whose
+// physical columns match the 4-byte M32 cell width for 8-bit data.  Only the
+// single valid column is used; the u8 carrier is required because the model
+// tags each Tile register with the dtype of the block that last wrote it and a
+// non-CUBE TSTORE's block dtype must equal that tag (a reinterpret_tile view
+// cannot re-tag a register).
+
 // BF16 amax -> E8M0 per OCP MX v1.0 Section 6.3: X = floor_pow2(amax) / 256.
-// Since 256 = 2^8, this is equivalent to: scale_exp = floor(log2(amax)) - 8.
-// Writes the raw E8M0 exponent code into a u8 carrier; see ScaleCodeTile for
-// why the code stays in a u8 tile rather than an E8M0 one.
+// Since 256 = 2^8 this is scale_exp = floor(log2(amax)) - 8.
 inline void tcvt_e8m0_ocp(ScaleCodeTile &dst, Fp16RowMaxTile &src) {
-  // Step 1: unscaled FP16 amax -> E8M0 with RTM (floor) rounding.  Public
-  // TCVT is fixed at RNONE, whose E8M0 RNE midpoint is the geometric mean
-  // sqrt(2), so it rounds up throughout (sqrt(2), 2) instead of flooring;
-  // hand-written asm is the only way to request RTM.  The destination is
-  // declared u8 and the E8M0 dtype is supplied to B.DATR directly, so the
-  // register is tagged u8 for the byte-domain arithmetic that follows.
+  // Step 1: unscaled FP16 amax -> E8M0 with RTM (floor) rounding.  Public TCVT
+  // is fixed at RNONE, whose E8M0 RNE midpoint is the geometric mean sqrt(2),
+  // so it rounds up throughout (sqrt(2), 2) instead of flooring; hand-written
+  // asm is the only way to request RTM.  The destination is declared u8 and the
+  // E8M0 dtype is supplied to B.DATR directly, so the register is tagged u8 for
+  // the byte-domain arithmetic that follows.
   ScaleCodeTile amax_e8m0;
   asm volatile(
       "BSTART.TEPL 27, %D[SrcT]\n"
-      "B.DATR %D[DstT], RTM\n"  // RTM = floor (LinxRMode 3)
+      "B.DATR %D[DstT], RTM\n"
       "B.DIM zero, %c[VCols], ->lb0\n"
       "B.DIM zero, %c[VRows], ->lb1\n"
-      "B.DIM zero, %c[Cols], ->lb2\n"
       "B.IOT %[Src], mask=1111, last, ->%[Dst]<%Z[Size]>\n"
       : [Dst] "=Tr"(amax_e8m0.data())
       : [SrcT] "i"(type_traits<__half>::TypeCode),
@@ -124,47 +97,28 @@ inline void tcvt_e8m0_ocp(ScaleCodeTile &dst, Fp16RowMaxTile &src) {
 
   // Step 2: apply the OCP /256 as an exponent subtraction in the raw byte
   // domain (256 = 2^8).  Preferred over dividing the FP16 amax by 256 before
-  // the convert: no FP16 rounding step at all, so it stays exact for
-  // amplitudes an FP16 division would have flushed toward subnormal.  U8
-  // TSUBS is ISA-legal -- TileVecArithmeticDataTypeSupported
-  // (dtype-layout.asl:101) admits U8 -- but gfrun's TEPL assertion was
-  // narrower than the ASL until SuperScalarModel issue #625.
-  // Caveat: this is a byte-domain subtract, so an amax whose E8M0 exponent
-  // code is below 8 wraps instead of clamping.  Out of range for this
-  // kernel's inputs; a saturating form would need TMAX against 8 first.
+  // the convert: no FP16 rounding step at all.  U8 TSUBS is ISA-legal
+  // (dtype-layout.asl:101) but gfrun's TEPL assertion was narrower than the ASL
+  // until SuperScalarModel issue #625.
   TSUBS(dst, amax_e8m0, static_cast<uint8_t>(8));
 }
 
 // E8M0 is a biased-exponent byte, so its reciprocal is 254 - code in the raw
 // byte domain: decode(254 - code) = 2^(127 - code) = 1 / decode(code).
-// TSUB on E8M0 tiles would be a numeric subtraction, not a storage-byte one,
-// so the codes are kept in u8 carriers throughout.
 inline void e8m0_reciprocal_code(ScaleCodeTile &dst, ScaleCodeTile &src) {
   ScaleCodeTile constant;
   TEXPANDS(constant, static_cast<uint8_t>(254));
   TSUB(dst, constant, src);
 }
 
-// Decode raw E8M0 exponent codes held in a u8 carrier into BF16 values.
-//
-// The public TCVT cannot express this: its source would have to be a
-// reinterpret_tile<__fp8_e8m0> view, and that view type does not expose
-// StorageBytes, which TCVT's derived-rows check reads.  Hand-written asm
-// instead declares the source dtype as E8M0 directly while binding the u8
-// tile's register -- the same technique tcvt_e8m0_ocp uses on the way in.
-//
-// The emitted encoding is identical to what TCVT(RowMaxTile, ScaleTile) would
-// produce: LB0/LB1 carry the source's valid columns/rows, LB2 the destination's
-// physical columns, and TSize the destination's capacity.  The [32,2]
-// ValidCol=1 source geometry is what keeps the capacity-derived physical rows
-// equal on both sides.
+// Raw E8M0 codes (u8 carrier) -> BF16 values.  Hand-written asm declares the
+// source dtype as E8M0 directly while binding the u8 tile's register.
 inline void tcvt_e8m0_code_to_bf16(RowMaxTile &dst, ScaleCodeTile &src) {
   asm volatile(
       "BSTART.TEPL 27, %D[SrcT]\n"
       "B.DATR %D[DstT], RNONE\n"
       "B.DIM zero, %c[VCols], ->lb0\n"
       "B.DIM zero, %c[VRows], ->lb1\n"
-      "B.DIM zero, %c[Cols], ->lb2\n"
       "B.IOT %[Src], mask=1111, last, ->%[Dst]<%Z[Size]>\n"
       : [Dst] "=Tr"(dst.data())
       : [SrcT] "i"(type_traits<__fp8_e8m0>::TypeCode),
@@ -180,16 +134,17 @@ inline void tcvt_e8m0_code_to_bf16(RowMaxTile &dst, ScaleCodeTile &src) {
 // Quantize one 32-wide MX block and emit its per-row E8M0 scale code.
 inline void quantize_block(BlockTile &dst, ScaleCodeTile &scale,
                            BlockTile &block) {
+  // |x| = max(x, -x): avoid TABS (see file header, issue #678).
+  BlockTile zero_block;
+  TSUB(zero_block, block, block);
+  BlockTile neg_block;
+  TSUB(neg_block, zero_block, block);
   BlockTile abs_block;
-  TABS(abs_block, block);
+  TMAX(abs_block, block, neg_block);
 
   RowMaxTile amax;
   TROWMAX(amax, abs_block);
 
-  // OCP MX v1.0 §6.3: scale = floor_pow2(amax) / 256.
-  // The RTM convert in tcvt_e8m0_ocp takes an FP16 source, so widen first
-  // (exact for this amplitude range); the /256 is applied there as a
-  // byte-domain exponent subtract.
   Fp16RowMaxTile amax_h;
   TCVT(amax_h, amax);
 
@@ -204,80 +159,128 @@ inline void quantize_block(BlockTile &dst, ScaleCodeTile &scale,
   TROWEXPANDMUL(dst, block, reciprocal);
 }
 
-// SPMD entry: [128, 64] complete tensor, 4 PE each process 32 rows.
+// One 32-row x 32-column MX group: load, quantize, store the E4M3 payload, and
+// hand back the E8M0 code column for the scale pack.
+inline void group_pass(ScaleCodeTile &code, const __bf16 *in, __fp8_e4m3 *out) {
+  BlockTile block;
+  {
+    global_tensor<__bf16, RowMajor<kRows, kCols>> gin(in);
+    TLOAD(block, gin);
+  }
+  BlockTile scaled;
+  quantize_block(scaled, code, block);
+
+  QuantBlockTile quant;
+  TCVT(quant, scaled);
+  {
+    global_tensor<__fp8_e4m3, RowMajor<kRows, kCols>> gout(out);
+    TSTORE(gout, quant);
+  }
+}
+
+// SPMD entry.  PE t owns rows [t*128, (t+1)*128).
 inline void run(__fp8_e4m3 *output, __fp8_e8m0 *scales, const __bf16 *input) {
   const uint32_t tid = get_thread_idx();
-  if (tid >= 4) return;
+  if (tid >= kPeCount) return;
 
-  // Each PE gets a contiguous [32, 64] row segment
-  const __bf16 *my_input = input + tid * kRows * kCols;
-  __fp8_e4m3 *my_output = output + tid * kRows * kCols;
-  __fp8_e8m0 *my_scales = scales + tid * kRows * kBlocksPerRow;
-  // The scale codes are stored from a u8 tile, so the GM view is u8 too; the
-  // bytes are identical to the E8M0 ones the caller expects.
-  uint8_t *my_scale_codes = reinterpret_cast<uint8_t *>(my_scales);
+  const __bf16 *my_input = input + tid * kRowsPerPe * kCols;
+  __fp8_e4m3 *my_output = output + tid * kRowsPerPe * kCols;
+  // Scale bytes are packed four groups per U32 word, so view the compact
+  // [512,8] byte tensor as [512,2] U32.
+  uint32_t *my_scale_words = reinterpret_cast<uint32_t *>(scales) +
+                             tid * kRowsPerPe * kPackedWords;
 
-  // Process two [32, 32] half-blocks with strided TLOAD/TSTORE
-  global_tensor<__bf16, RowMajor<kRows, kCols>> input_tensor(my_input);
-  global_tensor<__fp8_e4m3, RowMajor<kRows, kCols>> output_tensor(my_output);
+  using WordTile = VecTileM32<uint32_t, kRows, 1>;
 
-  // Left half-block [32, 32]: columns [0, 32)
-  BlockTile left_block;
-  TLOAD(left_block, input_tensor);
+  for (int rb = 0; rb < kRowBlocks; ++rb) {
+    const __bf16 *in_rb = my_input + rb * kRows * kCols;
+    __fp8_e4m3 *out_rb = my_output + rb * kRows * kCols;
 
-  BlockTile scaled_left;
-  ScaleCodeTile left_scale;
-  quantize_block(scaled_left, left_scale, left_block);
+    ScaleCodeTile code0, code1, code2, code3, code4, code5, code6, code7;
+    group_pass(code0, in_rb + 0 * kBlock, out_rb + 0 * kBlock);
+    group_pass(code1, in_rb + 1 * kBlock, out_rb + 1 * kBlock);
+    group_pass(code2, in_rb + 2 * kBlock, out_rb + 2 * kBlock);
+    group_pass(code3, in_rb + 3 * kBlock, out_rb + 3 * kBlock);
+    group_pass(code4, in_rb + 4 * kBlock, out_rb + 4 * kBlock);
+    group_pass(code5, in_rb + 5 * kBlock, out_rb + 5 * kBlock);
+    group_pass(code6, in_rb + 6 * kBlock, out_rb + 6 * kBlock);
+    group_pass(code7, in_rb + 7 * kBlock, out_rb + 7 * kBlock);
 
-  QuantBlockTile left_out;
-  TCVT(left_out, scaled_left);
-  TSTORE(output_tensor, left_out);
+    // Pack the eight E8M0 code columns, four at a time, into one U32 per row.
+    // TCVT widens u8 -> U32 (value preserving); TPACK takes 1 byte from each
+    // source, then 2 bytes from each, so word byte c is group c.
+    WordTile w0, w1, w2, w3, w4, w5, w6, w7;
+    TCVT(w0, code0);
+    TCVT(w1, code1);
+    TCVT(w2, code2);
+    TCVT(w3, code3);
+    TCVT(w4, code4);
+    TCVT(w5, code5);
+    TCVT(w6, code6);
+    TCVT(w7, code7);
 
-  global_iterator<global_tensor<uint8_t, RowMajor<kRows, kBlocksPerRow>>, ScaleCodeTile>
-      left_scale_iter(my_scale_codes);
-  auto left_scale_global = left_scale_iter(0, 0);
-  TSTORE(left_scale_global, left_scale);
+    WordTile p01, p23, low;
+    TPACK(p01, w0, w1, 0x00000101);
+    TPACK(p23, w2, w3, 0x00000101);
+    TPACK(low, p01, p23, 0x00000202);  // groups 0..3
 
-  // Right half-block [32, 32]: columns [32, 64)
-  global_tensor<__bf16, RowMajor<kRows, kCols>> input_right(my_input + kBlock);
-  BlockTile right_block;
-  TLOAD(right_block, input_right);
+    WordTile p45, p67, high;
+    TPACK(p45, w4, w5, 0x00000101);
+    TPACK(p67, w6, w7, 0x00000101);
+    TPACK(high, p45, p67, 0x00000202);  // groups 4..7
 
-  BlockTile scaled_right;
-  ScaleCodeTile right_scale;
-  quantize_block(scaled_right, right_scale, right_block);
+    // [32,2] U32 view with row stride 2 words = 8 bytes; low/high at columns
+    // 0/1.  Together they fill the row block's 32 x 8 scale bytes.
+    using ScaleWords = global_tensor<uint32_t, RowMajor<kRows, kPackedWords>>;
+    uint32_t *row_block_words = my_scale_words + rb * kRows * kPackedWords;
 
-  QuantBlockTile right_out;
-  TCVT(right_out, scaled_right);
+    global_iterator<ScaleWords, WordTile> low_iter(row_block_words);
+    auto low_global = low_iter(0, 0);
+    TSTORE(low_global, low);
 
-  global_tensor<__fp8_e4m3, RowMajor<kRows, kCols>> output_right(my_output + kBlock);
-  TSTORE(output_right, right_out);
-
-  global_iterator<global_tensor<uint8_t, RowMajor<kRows, kBlocksPerRow>>, ScaleCodeTile>
-      right_scale_iter(my_scale_codes + 1);
-  auto right_scale_global = right_scale_iter(0, 0);
-  TSTORE(right_scale_global, right_scale);
+    global_iterator<ScaleWords, WordTile> high_iter(row_block_words + 1);
+    auto high_global = high_iter(0, 0);
+    TSTORE(high_global, high);
+  }
 }
 
 #if 0
-// gfrun-only variant: pack the scaled halves back into one [kRows, kCols]
-// tile before the final E4M3 encode.  Kept for reference — TASSEMBLY lowers
-// to B.ASSEMBLE, which gfsim does not model, so the split-store run() above
-// is the default.
-inline void run(QuantizedTile &output, ScaleTile &left_scale,
-                ScaleTile &right_scale, BlockTile &left, BlockTile &right) {
-  BlockTile scaled_left, scaled_right;
-  quantize_block(scaled_left, left_scale, left);
-  quantize_block(scaled_right, right_scale, right);
-
-  TileArray<BlockTile, 1, kBlocksPerRow> scaled_parts;
-  TCVT(scaled_parts[0][0], scaled_left);
-  TCVT(scaled_parts[0][1], scaled_right);
-  InputTile scaled = TASSEMBLY<InputTile>(std::move(scaled_parts));
-
-  // BF16 -> E4M3, round-to-nearest-even with saturation.
-  TCVT(output, scaled);
-}
+// ---------------------------------------------------------------------------
+// Subview variant -- BLOCKED on LinxISA/Linx-TileOP-API issue #144.
+//
+// Goal: replace the eight strided [32,32] payload TLOADs per row block (64 B
+// bursts at a 512 B stride, ~12.5% cacheline utilisation) with ONE contiguous
+// [32,256] TLOAD (rows 512 B >= the 256 B cacheline) plus eight [32,32]
+// subviews for the per-group reductions.
+//
+// It does not compile today: TPARTVIEW's element is region::SubTileView, which
+// is not recognised by is_tile / is_tile_data_v, so TROWMIN and TROWEXPANDMUL
+// reject it (only TROWMAX / TEXP accept it).  range::Subview is a legal operand
+// but forwards the parent [32,256] shape instead of the fragment [32,32].  See
+// the issue for the full support matrix.  Delete the #if 0 once region::
+// SubTileView is a general tile operand (with its own valid shape).
+//
+// Sketch (per PE, per 32-row block rb):
+//   using RowBlockTile = VecTileM32<__bf16, kRows, kCols>;      // [32,256]
+//   RowBlockTile row_block;
+//   TLOAD(row_block, global_tensor<__bf16, RowMajor<kRows, kCols>>(in_rb));
+//   auto parts = TPARTVIEW<BlockTile, 1, kBlocksPerRow>(row_block);
+//   for g in [0,8) (unrolled, keeping code0..code7 for the scale pack):
+//     TROWMAX(row_max, parts[0][g]);
+//     TROWMIN(row_min, parts[0][g]);
+//     TSUB(zero, row_min, row_min);
+//     TSUB(neg_min, zero, row_min);
+//     TMAX(amax, row_max, neg_min);
+//     ... E8M0 code + reciprocal (same as quantize_block) ...
+//     TROWEXPANDMUL(scaled, parts[0][g], reciprocal);   // subview as src0
+//     TCVT(quant, scaled);
+//     TSTORE(per-group strided view);   // still 32 B / 256 B: the store cannot
+//                                       // be made one [32,256] row until
+//                                       // TASSEMBLY/B.ASSEMBLE is modelled.
+//
+// Store side: assembling the eight quantised groups back into one [32,256] row
+// and TSTOREing it whole needs TASSEMBLY / B.ASSEMBLE; gfsim does not model
+// B.ASSEMBLE yet.
 #endif
 
 }  // namespace mxquant

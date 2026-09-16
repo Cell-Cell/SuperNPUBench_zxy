@@ -34,17 +34,16 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 # src -> mxquant -> kernel -> test -> one-level-arch
-ONE_LEVEL_ROOT = SCRIPT_DIR.parents[4]
+ONE_LEVEL_ROOT = SCRIPT_DIR.parents[3]
 ELF_DIR = ONE_LEVEL_ROOT / "output/kernel/mxquant/elf"
 COMPARE_ROOT = ONE_LEVEL_ROOT / "compare"
 
-ROWS = 128
+ROWS = 512
+COLS = 256
 BLOCK = 32
 # variant name -> column count
 VARIANTS = {
-    "mxquant": 64,
-    "mxquant_1024_assembly": 1024,
-    "mxquant_1024_streaming": 1024,
+    "mxquant": COLS,
 }
 
 EXPORTS = ("input_readback.bin", "output.bin", "scale_output.bin",

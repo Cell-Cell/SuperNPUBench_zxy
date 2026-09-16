@@ -1,6 +1,6 @@
 #pragma once
 
-// Shared driver for the three mxquant test entries.
+// Driver for the single [512, 256] mxquant test entry.
 //
 // The kernels are SPMD: main() runs on all four PEs and each kernel slices the
 // [kTotalRows, kCols] tensor by M via get_thread_idx().  Always run with

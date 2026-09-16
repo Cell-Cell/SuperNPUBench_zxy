@@ -1,9 +1,8 @@
 #pragma once
 
-// Shared scalar reference for all mxquant test entries (64-wide and
-// 1024-wide variants).  Kept deliberately separate from the TileOP kernels
-// so a byte-for-byte check is possible without hiding the kernel dataflow.
-// Compiled only into res_check=on builds.
+// Scalar reference for the [512, 256] mxquant test entry.  Kept deliberately
+// separate from the TileOP kernel so a byte-for-byte check is possible without
+// hiding the kernel dataflow.  Compiled only into res_check=on builds.
 
 #include <common/pto_tileop.hpp>
 #include <cstdint>
