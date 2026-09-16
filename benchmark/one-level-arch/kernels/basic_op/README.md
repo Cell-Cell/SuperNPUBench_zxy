@@ -61,7 +61,7 @@ make -C benchmark/one-level-arch/test/kernel/element_wise/gelu \
 
 The 2026-08-29 full regression used main `linx-toolchain-build` commit
 `e6a31ef` and SuperScalarModel commit `d8903938`. It compiled every configuration
-listed by the `multi_thread` `compile.all` files and ran each ELF with four
+listed by the `basic_op` `compile.all` files and ran each ELF with four
 simulated PEs.
 
 | Operator family | ELF | PASS | FAIL |
