@@ -32,18 +32,22 @@ divisible by the PE count. This is checked at compile time.
 | Row Max/Prod/Sum | `reduction/reducemax_rowvec.hpp`, `reduction/reduceprod_rowvec.hpp`, `reduction/reducesum_rowvec.hpp` |
 | 2D Transpose | `transpose/transpose.hpp` |
 
-## Mirrored directory layout
+## Directory layout
 
-Kernel and test paths mirror the single-PE tree. For example:
+Each operator directory holds both the four-PE wrapper and the single-PE base
+implementation it partitions. The base header lives under `<op>/detail/` so it
+does not collide with the wrapper that shares its name:
 
-| Single PE | Four PE |
+| Base implementation | Four-PE wrapper |
 |---|---|
-| `kernels/single_thread/gather/gather.hpp` | `kernels/multi_thread/gather/gather.hpp` |
-| `test/kernel/gather/` | `test/kernel/multi_thread/gather/` |
-| `test/kernel/element_wise/gelu/` | `test/kernel/multi_thread/element_wise/gelu/` |
+| `multi_thread/gather/detail/gather.hpp` | `multi_thread/gather/gather.hpp` |
+| `multi_thread/element_wise/detail/gelu.hpp` | `multi_thread/element_wise/gelu.hpp` |
 
-Each operator directory has its own `Makefile`, `compile.all`, and `src/`
-instead of sharing a mixed test source. One model failure therefore does not
+Shared helpers live in `multi_thread/utils/` (`spmd_partition.hpp`,
+`layout_transform.hpp`); the MX-quantized matmul base used by the
+`quant_batch_matmul` solution is `multi_thread/matmul/matmul_mx.hpp`. Each
+operator has its own test directory under `test/kernel/multi_thread/<op>/`
+with a `Makefile`, `compile.all`, and `src/`, so one model failure does not
 hide the status of other operator classes.
 
 ## Four-PE operator execution regression

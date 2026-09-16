@@ -9,29 +9,21 @@ The `test` tree contains kernel test suites. All make-driven suites reuse
 | Path | Use it for |
 | --- | --- |
 | [`common`](common) | Shared make rules, platform flags, output layout, simulator targets, `_start.s`, `benchmark.h`. |
-| [`kernel`](kernel) | Per-operator suites: broadcast, concat, control, element_wise, fa, gather, matmul, reduction, sort, transpose. |
+| [`kernel`](kernel) | Four-PE per-operator suites under `kernel/multi_thread/`. |
 
 ## Kernel Test Suites
 
-| Directory | Operations |
-| --- | --- |
-| [`kernel/broadcast`](kernel/broadcast) | Broadcast (various shapes). |
-| [`kernel/concat`](kernel/concat) | Concat-gather / concat-scatter. |
-| [`kernel/control`](kernel/control) | Hash-table lookup (pure tile-op). |
-| [`kernel/element_wise`](kernel/element_wise) | GELU. |
-| [`kernel/fa`](kernel/fa) | Flash attention. |
-| [`kernel/gather`](kernel/gather) | Gather. |
-| [`kernel/matmul`](kernel/matmul) | Matmul (HIF4_HIF4, A16W4, MASK). |
-| [`kernel/reduction`](kernel/reduction) | Reduction (max, sum). |
-| [`kernel/sort`](kernel/sort) | Topk. |
-| [`kernel/transpose`](kernel/transpose) | Transpose. |
+Single-thread suites have been retired. The active four-PE suites live under
+[`kernel/multi_thread`](kernel/multi_thread); see
+[`kernel/multi_thread/README.md`](kernel/multi_thread/README.md) for the
+operator list and partition rules.
 
 ## Common Build Pattern
 
 ```sh
-cd test/kernel/matmul
-make TESTCASE=matmul TYPE=HIF4_HIF4 M=256 N=2048 K=2048 tM=64 tN=64 tK=128 \
-    COMPILER_DIR=/path/to/linx/compiler/bin
+cd test/kernel/multi_thread/matmul
+make TESTCASE=matmul COMPILER_DIR=/path/to/linx/compiler/bin \
+    B=1 M=256 N=256 K=256 tM=32 tN=32 tK=32
 ```
 
 Platform values:
@@ -51,8 +43,8 @@ Build products are written under the arch-level `output/` directory
 Each suite ships a local `compile.all`; run it from the suite directory:
 
 ```sh
-cd test/kernel/matmul && bash compile.all
-cd test/kernel/broadcast && bash compile.all
+cd test/kernel/multi_thread/matmul && bash compile.all
+cd test/kernel/multi_thread/broadcast && bash compile.all
 ```
 
 Whole-backend batch: `./compile_all.sh two-level|one-level|all` from the repo root.

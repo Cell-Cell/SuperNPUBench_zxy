@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/element_wise/gelu.hpp"
+#include "multi_thread/element_wise/detail/gelu.hpp"
 
 #include <cstdint>
 

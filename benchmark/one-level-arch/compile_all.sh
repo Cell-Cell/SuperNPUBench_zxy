@@ -46,20 +46,6 @@ compile_operator() {
 }
 
 # Compile all operators
-compile_operator "$REPO_ROOT/test/kernel/matmul" "matmul"
-compile_operator "$REPO_ROOT/test/kernel/broadcast" "broadcast"
-compile_operator "$REPO_ROOT/test/kernel/concat" "concat"
-compile_operator "$REPO_ROOT/test/kernel/gather" "gather"
-compile_operator "$REPO_ROOT/test/kernel/transpose" "transpose"
-compile_operator "$REPO_ROOT/test/kernel/element_wise/gelu" "gelu"
-compile_operator "$REPO_ROOT/test/kernel/reduction/reducemax_col" "reducemax_col"
-compile_operator "$REPO_ROOT/test/kernel/reduction/reducemax_row" "reducemax_row"
-compile_operator "$REPO_ROOT/test/kernel/reduction/reducesum_col" "reducesum_col"
-compile_operator "$REPO_ROOT/test/kernel/reduction/reducesum_row" "reducesum_row"
-compile_operator "$REPO_ROOT/test/kernel/control" "control"
-compile_operator "$REPO_ROOT/test/kernel/fa" "fa"
-compile_operator "$REPO_ROOT/test/kernel/sort" "sort"
-compile_operator "$REPO_ROOT/test/kernel/flashMLA" "flashMLA"
 compile_operator "$REPO_ROOT/test/solution/moe_dispatch" "solution/moe_dispatch"
 compile_operator "$REPO_ROOT/test/solution/moe_combine" "solution/moe_combine"
 compile_operator "$REPO_ROOT/test/solution/mega_moe" "solution/mega_moe"

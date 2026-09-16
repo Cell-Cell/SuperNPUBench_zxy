@@ -160,13 +160,9 @@ export COMPILER_DIR=/path/to/linx_blockisa_llvm_musl/bin
 ### 2. Compile an operator
 
 ```bash
-# one-level-arch (PTO ISA)
-cd benchmark/one-level-arch/test/kernel/matmul
-make TESTCASE=matmul TYPE=MASK MODE=MASK_FP32 M=256 N=256 K=256 tM=16 tN=16 tK=64
-
-# deepseek kernel
-cd benchmark/one-level-arch/test/kernel/deepseek
-make TESTCASE=fused_weight diss
+# one-level-arch (PTO ISA) — multi-thread operator
+cd benchmark/one-level-arch/test/kernel/multi_thread/matmul
+make TESTCASE=matmul COMPILER_DIR="$COMPILER_DIR" B=1 M=256 N=256 K=256 tM=32 tN=32 tK=32
 ```
 
 ### 3. Batch / full compilation

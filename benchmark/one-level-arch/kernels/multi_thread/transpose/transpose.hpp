@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/transpose/transpose.hpp"
+#include "multi_thread/transpose/detail/transpose.hpp"
 
 #include <cstdint>
 

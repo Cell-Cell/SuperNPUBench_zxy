@@ -1,7 +1,7 @@
 #pragma once
 
 #include "multi_thread/utils/spmd_partition.hpp"
-#include "single_thread/reduction/reducesum_rowvec.hpp"
+#include "multi_thread/reduction/detail/reducesum_rowvec.hpp"
 
 #include <cstdint>
 
