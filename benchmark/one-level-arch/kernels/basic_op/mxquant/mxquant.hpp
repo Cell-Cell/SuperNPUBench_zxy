@@ -51,7 +51,6 @@ static_assert(kE4M3Max == 448, "this profile uses the E4M3 max finite value");
 
 using BlockTile = VecTileM32<__bf16, kRows, kBlock>;
 using RowMaxTile = VecTileM32<__bf16, kRows, 1>;
-using Fp16RowMaxTile = VecTileM32<__half, kRows, 1>;
 using QuantBlockTile = VecTileM32<__fp8_e4m3, kRows, kBlock>;
 using ScaleTile = VecTileM32<__fp8_e8m0, kRows, 4, kRows, 1>;
 using ScaleCodeTile = VecTileM32<uint8_t, kRows, 4, kRows, 1>;
@@ -71,13 +70,16 @@ static_assert(RowMaxTile::ValidCol == 1 && RowMaxTile::Cols == 1,
 
 // BF16 amax -> E8M0 per OCP MX v1.0 Section 6.3: X = floor_pow2(amax) / 256.
 // Since 256 = 2^8 this is scale_exp = floor(log2(amax)) - 8.
-inline void tcvt_e8m0_ocp(ScaleCodeTile &dst, Fp16RowMaxTile &src) {
-  // Step 1: unscaled FP16 amax -> E8M0 with RTM (floor) rounding.  Public TCVT
-  // is fixed at RNONE, whose E8M0 RNE midpoint is the geometric mean sqrt(2),
-  // so it rounds up throughout (sqrt(2), 2) instead of flooring; hand-written
-  // asm is the only way to request RTM.  The destination is declared u8 and the
-  // E8M0 dtype is supplied to B.DATR directly, so the register is tagged u8 for
-  // the byte-domain arithmetic that follows.
+//
+// The amax is converted DIRECTLY from BF16: the model's E8M0 encoder accepts
+// BF16/FP16/FP32 sources (HardwareTCVTE8M0SourceTypeSupported), so the old
+// FP16-widening TCVT is unnecessary and one [kRows,1] TCVT per MX group is
+// dropped.  RTM (floor) still requires hand-written asm because the public
+// TCVT is fixed at RNONE, whose E8M0 RNE midpoint is sqrt(2) and rounds up on
+// (sqrt(2), 2) instead of flooring.  The destination is declared u8 and the
+// E8M0 dtype is supplied to B.DATR directly, so the register is tagged u8 for
+// the byte-domain arithmetic that follows.
+inline void tcvt_e8m0_ocp(ScaleCodeTile &dst, RowMaxTile &src) {
   ScaleCodeTile amax_e8m0;
   asm volatile(
       "BSTART.TEPL 27, %D[SrcT]\n"
@@ -86,20 +88,19 @@ inline void tcvt_e8m0_ocp(ScaleCodeTile &dst, Fp16RowMaxTile &src) {
       "B.DIM zero, %c[VRows], ->lb1\n"
       "B.IOT %[Src], mask=1111, last, ->%[Dst]<%Z[Size]>\n"
       : [Dst] "=Tr"(amax_e8m0.data())
-      : [SrcT] "i"(type_traits<__half>::TypeCode),
+      : [SrcT] "i"(type_traits<__bf16>::TypeCode),
         [DstT] "i"(type_traits<__fp8_e8m0>::TypeCode),
         [Src] "Tr"(src.data()),
         [Size] "i"(ScaleCodeTile::TilesizeCode),
-        [VCols] "i"(Fp16RowMaxTile::ValidCol),
-        [VRows] "i"(Fp16RowMaxTile::ValidRow),
+        [VCols] "i"(RowMaxTile::ValidCol),
+        [VRows] "i"(RowMaxTile::ValidRow),
         [Cols] "i"(ScaleCodeTile::Cols)
       : "memory");
 
   // Step 2: apply the OCP /256 as an exponent subtraction in the raw byte
-  // domain (256 = 2^8).  Preferred over dividing the FP16 amax by 256 before
-  // the convert: no FP16 rounding step at all.  U8 TSUBS is ISA-legal
-  // (dtype-layout.asl:101) but gfrun's TEPL assertion was narrower than the ASL
-  // until SuperScalarModel issue #625.
+  // domain (256 = 2^8), rather than dividing the amax before the convert.  U8
+  // TSUBS is ISA-legal (dtype-layout.asl:101) but gfrun's TEPL assertion was
+  // narrower than the ASL until SuperScalarModel issue #625.
   TSUBS(dst, amax_e8m0, static_cast<uint8_t>(8));
 }
 
@@ -145,10 +146,7 @@ inline void quantize_block(BlockTile &dst, ScaleCodeTile &scale,
   RowMaxTile amax;
   TROWMAX(amax, abs_block);
 
-  Fp16RowMaxTile amax_h;
-  TCVT(amax_h, amax);
-
-  tcvt_e8m0_ocp(scale, amax_h);
+  tcvt_e8m0_ocp(scale, amax);
 
   ScaleCodeTile reciprocal_code;
   e8m0_reciprocal_code(reciprocal_code, scale);
