@@ -17,10 +17,31 @@
 # derives the scalar golden from it, and exports both for src/run_mxquant_check.py
 # to compare byte-for-byte.  The default build runs the tile kernel alone and is
 # the one to hand a cycle simulator.
+#
+# Three TIMING-ONLY siblings exist for performance work (no output, so they are
+# deliberately NOT in compile.all and must not be res_checked):
+#   mxquant_compute       no TLOAD/TSTORE, input from TEXPANDS
+#   mxquant_compute_tabs  same, but |x| = TABS (invalid on gfrun, issue #678)
+#   mxquant_texpands      only the input TEXPANDS, to subtract its cost
+# Build/compare them with src/../perf_compare.sh.
 
 TESTCASE ?= mxquant
 
+ifeq ($(TESTCASE),mxquant)
 SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant.cpp
 TARGET = $(ELF_HEAD)_mxquant_PE4.elf
+else ifeq ($(TESTCASE),mxquant_compute)
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant_compute.cpp
+TARGET = $(ELF_HEAD)_mxquant_compute_PE4.elf
+else ifeq ($(TESTCASE),mxquant_compute_tabs)
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant_compute_tabs.cpp
+TARGET = $(ELF_HEAD)_mxquant_compute_tabs_PE4.elf
+else ifeq ($(TESTCASE),mxquant_texpands)
+SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mxquant_texpands.cpp
+TARGET = $(ELF_HEAD)_mxquant_texpands_PE4.elf
+else
+$(error Unsupported TESTCASE=$(TESTCASE); expected mxquant, mxquant_compute, \
+mxquant_compute_tabs, or mxquant_texpands)
+endif
 
 include ../../common/Makefile.common
