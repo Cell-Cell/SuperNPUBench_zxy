@@ -58,21 +58,13 @@ constexpr int kPeNum = 4;       // One cooperative QK/PV matmul uses four PEs.
 constexpr int kMxGroup = 32;    // OCP MX scale granularity along matrix K.
 constexpr int kPackedFactor = 2;  // E2M1x2 packs two logical FP4 values/byte.
 
-// TODO(TileOP issue filed): the probability scale carrier should be an
-// M32-layout E8M0 tile, matching the M32 BF16 row that produces it.  The
-// current implementation temporarily routes the scale through a RowMajor
-// Scaling tile.  Public TCVT already exposes RMode, but it requires a CUBE_M32
-// source to preserve its CUBE_M32 layout, so it cannot express this temporary
-// CUBE_M32 <-> RowMajor bridge.  Keep this helper only until the tracked M32
-// E8M0 scale path is available.
-//
-// MX scale generation needs an explicit floor-to-power-of-two conversion:
+// The probability scale carrier is an M32-layout E8M0 tile, matching the
+// M32 BF16 row that produces it.  MX scale generation needs an explicit
+// floor-to-power-of-two conversion:
 //   LINX_RDN   -> RTM (round toward minus infinity / floor for positive amax)
 //   otherwise  -> RNONE
-// It also permits the compact BF16 CUBE row carrier and the padded RowMajor
-// Scaling carrier to be connected without pretending they have one C++ tile
-// type.  This helper performs a real conversion; it is distinct from the
-// compromise wide-to-compact reduction-result TCVTs described above.
+// This helper performs a real dtype conversion.  Reduction-result prefix
+// selection instead uses TREDUCEPREFIXVIEW and does not call TCVT.
 template <int RMode, typename Dst, typename Src>
 inline void fa_lowp_tcvt(Dst &dst, Src &src) {
     const size_t validCol = src.GetValidCol();
@@ -83,14 +75,16 @@ inline void fa_lowp_tcvt(Dst &dst, Src &src) {
         ".else\nB.DATR %D[DstT], RNONE\n.endif\n"
         "B.DIM %[VCol], 0, ->lb0\n"
         "B.DIM %[VRow], 0, ->lb1\n"
-        "B.DIM zero, %c[Cols], ->lb2\n"
+        ".if %c[CubeM] == 0\nB.DIM zero, %c[Cols], ->lb2\n.endif\n"
         "B.IOT %[Src], mask=1111, last, ->%[Dst]<%Z[Size]>\n"
         : [Dst] "=Tr"(dst.data())
         : [SrcT] "i"(type_traits<typename Src::DType>::TypeCode),
           [DstT] "i"(type_traits<typename Dst::DType>::TypeCode),
           [Src] "Tr"(src.data()), [Size] "i"(Dst::TilesizeCode),
           [VCol] "r"(validCol), [VRow] "r"(validRow),
-          [Cols] "i"(Dst::Cols), [RMode] "i"(RMode)
+          [Cols] "i"(Dst::Cols), [RMode] "i"(RMode),
+          [CubeM] "i"(Src::BFractal == BLayout::CubeM32 &&
+                       Dst::BFractal == BLayout::CubeM32)
         : "memory");
 }
 
@@ -104,22 +98,8 @@ template <typename Out, typename Parent, typename Sub>
 inline void materialize_subview(Out &dst,
                                 region::SubTileView<Parent, Sub> &src,
                                 typename Sub::DType scalar) {
-    const uintptr_t base = src.GetRangeBase();
-    asm volatile(
-        "BSTART.TEPL 34, %D[Type]\n"
-        "B.DIM zero, %c[VCol], ->lb0\n"
-        "B.DIM zero, %c[VRow], ->lb1\n"
-        "B.DIM zero, %c[Cols], ->lb2\n"
-        "B.IOT %[Src], mask=1111, last, ->%[Dst]<%Z[DstSize]>\n"
-        "B.SUBVIEW 0, %[Base], 0, %c[SrcSize]\n"
-        "B.IOR [%[Scalar]],[]\n"
-        : [Dst] "=Tr"(dst.data())
-        : [Type] "i"(type_traits<typename Sub::DType>::TypeCode),
-          [Src] "Tr"(src.data()), [Base] "r"(base),
-          [Scalar] "r"(scalar), [DstSize] "i"(Out::TilesizeCode),
-          [SrcSize] "i"(Sub::TilesizeCode), [VCol] "i"(Sub::ValidCol),
-          [VRow] "i"(Sub::ValidRow), [Cols] "i"(Sub::Cols)
-        : "memory");
+    // The TileOP SubTileView overload emits B.SUBVIEW and its CUBE B.DATR.
+    TMULS(dst, src, scalar);
 }
 
 template <int Sq, int Skv, int qD, int vD, int kTm, int kTk,
@@ -197,28 +177,26 @@ void flash_attention_lowp_impl(
 
     // Per-PE QK/softmax tiles.  Score is the BF16 fixpipe destination.
     // Reduce/BlockReduce deliberately retain the source's physical columns
-    // with ValidCol=1 to satisfy PTO #311.  Row is the compact descriptor
-    // required by TMAX, TFMA and TROWEXPAND*.
+    // with ValidCol=1 to satisfy PTO #311.  Row keeps one valid column but
+    // occupies a full BF16 M32 CELL (two physical columns).
     using Score = CubeTileM32<__bf16, kPeM, kTk>;
     using Reduce = VecTileM32<__bf16, kPeM, kTk, kPeM, 1>;
-    using Row = VecTileM32<__bf16, kPeM, 1, kPeM, 1>;
+    using Row = VecTileM32<__bf16, kPeM, 2, kPeM, 1>;
     using ScoreBlock = CubeTileM32<__bf16, kPeM, kMxGroup>;
     using BlockReduce = VecTileM32<__bf16, kPeM, kMxGroup, kPeM, 1>;
     // P is quantized group-by-group.  PBlock contains 32 logical E2M1 values
     // per row; PScaleFragment contains the corresponding one valid scale.
     //
-    // TODO(TileOP issue filed): PScaleFragment/PScale should use an M32 E8M0
-    // layout.  RowMajor Scaling below is only the current API workaround and
-    // must not be treated as the intended scale layout.  It is physically
+    // The scale uses the same M32 layout as its BF16 source.  It is physically
     // padded to four columns (the 128 B minimum), while only the first column
-    // is valid.  TASSEMBLY concatenates these temporary physical fragments;
+    // is valid.  TASSEMBLY concatenates these physical fragments;
     // PScale exposes exactly kTk/32 valid scale columns to TMATMUL_MX.
     using PBlock = CubeTileM32<__fp4_e2m1x2, kPeM, kMxGroup>;
     using P = CubeTileM32<__fp4_e2m1x2, kPeM, kTk>;
     using PScaleFragment = Tile<Location::Scaling, __fp8_e8m0,
-        kPeM, 4, BLayout::RowMajor, kPeM, 1>;
+        kPeM, 4, BLayout::CubeM32, kPeM, 1>;
     using PScale = Tile<Location::Scaling, __fp8_e8m0,
-        kPeM, 4 * kPScaleCols, BLayout::RowMajor, kPeM, kPScaleCols>;
+        kPeM, 4 * kPScaleCols, BLayout::CubeM32, kPeM, kPScaleCols>;
     using PV = CubeAccumulatorM32<float, kPeM, vD>;
     using OCast = CubeAccumulatorM32<__bf16, kPeM, vD>;
     using FloatRow = VecTileM32<float, kPeM, 1, kPeM, 1>;
@@ -366,31 +344,29 @@ void flash_attention_lowp_impl(
                 TMULS(scaleBf16, scaleBf16, kInvFp4PowerMax);
                 // RTM is essential here: E8M0 represents powers of two, and
                 // MX requires floor(log2), not nearest-exponent rounding.
-                // TODO(TileOP issue filed): replace this bridge with public
-                // TCVT<LINX_RDN> once scale is represented as M32 E8M0.
+                // The E8M0 scale retains the M32 layout of scaleBf16.
                 PScaleFragment scale;
                 fa_lowp_tcvt<LINX_RDN>(scale, scaleBf16);
 
                 // Decode the quantized E8M0 scale back to BF16, form its
                 // reciprocal, normalize the block, and finally encode E2M1x2.
-                // This reverse bridge is part of the same temporary RowMajor
-                // scale workaround; the intended scale carrier is M32 E8M0.
+                // The reverse conversion also stays in M32 layout.
                 Row decodedScale;
                 fa_lowp_tcvt<LINX_RNONE>(decodedScale, scale);
                 Row reciprocal;
                 TRECIP(reciprocal, decodedScale);
                 ScoreBlock normalized;
                 TROWEXPANDMUL(normalized, pBlock, reciprocal);
-                PBlock quantized;
-                TCVT(quantized, normalized);
-
-                // These TCVTs write into TileArray assembly slots.  They are
-                // staging copies into the data/scale assembly carriers, not a
-                // change to the MX scale definition.
+                // Convert the BF16 probabilities directly into the E2M1x2
+                // assembly slot.  Avoid an intermediate PBlock and an
+                // unnecessary second E2M1x2 -> E2M1x2 TCVT.
                 auto pSlot = pFragments[0][block];
                 auto sSlot = pScaleFragments[0][block];
-                TCVT(pSlot, quantized);
-                TCVT(sSlot, scale);
+                TCVT(pSlot, normalized);
+                // E8M0 cannot be a TCVT source under the ISA hardware profile.
+                // Re-encode the BF16 scale directly into its assembly slot
+                // with RTM, matching the standalone scale used above.
+                TCVT<LINX_RDN>(sSlot, scaleBf16);
             }
 
             // Finish both assembly sessions.  p has logical shape [32,kTk];
