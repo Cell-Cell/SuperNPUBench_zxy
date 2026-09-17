@@ -1,5 +1,25 @@
-#ifndef QUANT_SPARSE_FLASH_MLA_HPP
-#define QUANT_SPARSE_FLASH_MLA_HPP
+#ifndef QUANT_SPARSE_FLASH_MLA_V2_HPP
+#define QUANT_SPARSE_FLASH_MLA_V2_HPP
+
+// =============================================================================
+// quant_sparse_flash_mla_v2.hpp — Dynamic-shape variant of the unified
+// five-mode four-PE TADD QSMLA kernel.
+//
+// Differences from quant_sparse_flash_mla.hpp (static version):
+//   1. All Vec-engine Tiles use DYNAMIC ValidRow/ValidCol. The runtime
+//      valid region is set per KV block via the Tile(VR, VC) constructor,
+//      so B.DIM encodes the register form ("B.DIM %[reg], 0") instead of
+//      the immediate form ("B.DIM zero, %c[imm]").
+//   2. tileW's ValidCol tracks the actual number of valid KV tokens in
+//      each block (not the full kTk). Row reductions (TROWMAX / TROWSUM)
+//      and broadcasts therefore operate on the true valid region — the
+//      software mask is retained for pass-2 PV correctness but the
+//      hardware now also sees the correct geometry.
+//   3. Shared tiles (cooperative TMATMUL operands) and Cube accumulator
+//      tiles remain static — PTO v0.58 requires compile-time valid shapes
+//      for cooperative matrix operations (TMATMUL static_assert).
+//   4. gmGatherKV / iterators unchanged (they consume the physical shape).
+// =============================================================================
 
 #include <type_traits>
 #include <common/pto_tileop.hpp>
@@ -9,14 +29,9 @@
 
 using namespace pto;
 
-// Unified five-mode four-PE TADD implementation. Mode selection only decides
-// which logical ORI/CMP RANGE or INDEXED sources participate. Every source is
-// then visited by the same QK -> online-softmax -> PV machinery and updates
-// one shared (m,l,O) state. Indexed rows use one reusable TileK-by-D staging
-// tile; no TopK-by-D or source-length-by-D workspace is allocated.
 template <typename qdtype, typename kvdtype, typename odttype,
           typename ModeConfig>
-void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
+void quant_sparse_flash_mla_tadd_4pe_bsnd_pto_v2(
     odttype* out_ptr,
     qdtype* q_ptr,
     kvdtype* ori_kv_ptr,
@@ -64,12 +79,10 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
 
     const int pe_id = static_cast<int>(get_thread_idx());
 
+    // ---- Cooperative tiles: STATIC (PTO v0.58 TMATMUL requirement) -------
+    // These participate in cooperative TMATMUL and must have compile-time
+    // valid shapes: "Matrix dynamic valid shapes are not supported".
     using tileQMatrix = SharedMatrixLeft<qdtype, kGroupM, kTd>;
-    // Keep K in its original [Tk,Td] RowMajor layout, like V. QK applies
-    // the logical transpose through Shared B's B.FPATR TransB control.
-    // Current ASL deletes standalone TTRANS (TEPL selector 0x06e); direct
-    // Shared TLOAD also avoids the legacy Local-to-Shared publish opcode.
-    // Neither a Local transposed tile nor a full transposed GM KV is needed.
     using tileKMatrix = SharedMatrixRight<kvdtype, kTk, kTd>;
     using tilePMatrix = SharedMatrixLeft<qdtype, kGroupM, kTk>;
     using tileVMatrix = SharedMatrixRight<kvdtype, kTk, kTd>;
@@ -79,20 +92,34 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
     using tileVShared = SharedTile<tileVMatrix>;
     using tileScoreCube = CubeAccumulatorM16<float, kPeRows, kTk>;
     using tilePVCube = CubeAccumulatorM16<float, kPeRows, kTd>;
+
+    // ---- Vector tiles: DYNAMIC valid region ---------------------------------
+    // Physical shape is still compile-time [kPeRows, kTk] (register
+    // allocation), but the valid region is set at runtime. B.DIM uses
+    // the register form ("B.DIM %[reg], 0") for the dynamic dims.
+    //
+    // v2 enhancement: tileW's ValidCol is set to the actual valid KV
+    // token count per block, not the full kTk. This makes row reductions
+    // (TROWMAX / TROWSUM) and broadcasts operate on the true geometry.
     using tileW =
-        Tile<Location::Vec, float, kPeRows, kTk, BLayout::RowMajor>;
+        Tile<Location::Vec, float, kPeRows, kTk, BLayout::RowMajor,
+             DYNAMIC, DYNAMIC>;
     using tileMask = tileW;
     using tilePShard =
-        Tile<Location::Vec, qdtype, kPeRows, kTk, BLayout::RowMajor>;
+        Tile<Location::Vec, qdtype, kPeRows, kTk, BLayout::RowMajor,
+             DYNAMIC, DYNAMIC>;
     using tileO =
-        Tile<Location::Vec, float, kPeRows, kTd, BLayout::RowMajor>;
+        Tile<Location::Vec, float, kPeRows, kTd, BLayout::RowMajor,
+             DYNAMIC, DYNAMIC>;
     using tileOCast =
-        Tile<Location::Vec, odttype, kPeRows, kTd, BLayout::RowMajor>;
+        Tile<Location::Vec, odttype, kPeRows, kTd, BLayout::RowMajor,
+             DYNAMIC, DYNAMIC>;
     using tileMax =
         Tile<Location::Vec, float, kPeRows, 1, BLayout::RowMajor,
-             kPeRows, 1>;
+             DYNAMIC, 1>;
     using tileSum = tileMax;
 
+    // ---- GM tensors and iterators (use physical shape, unchanged) ---------
     using gmQ = global_tensor<qdtype, RowMajor<kGroupM, Config::D>>;
     using gmGatherKV = global_tensor<kvdtype, RowMajor<kTk, Config::D>>;
     using gmO = global_tensor<odttype, RowMajor<kGroupM, Config::D>>;
@@ -121,7 +148,6 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
 
     constexpr int kMaskElements = kPeRows * kTk;
     float mask_buf[kMaskElements];
-    // One bounded staging tile is reused by ORI and CMP and by both passes.
     kvdtype kv_tile_buf[kTk * Config::D];
     int ori_selected[kOriIndexStorage];
     int cmp_selected[kCmpIndexStorage];
@@ -159,7 +185,7 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 * ModeConfig::OriTopK;
             const std::size_t length_offset =
                 (static_cast<std::size_t>(work.batch) * Config::S1
-                 + work.q_token) * Config::N2 + work.kv_head;
+                  + work.q_token) * Config::N2 + work.kv_head;
             int candidate_count = ori_topk_length[length_offset];
             candidate_count = qsmla_sparse_clamp(
                 candidate_count, 0, ModeConfig::OriTopK);
@@ -177,8 +203,6 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 ModeConfig::CmpS2, Config::S1,
                 work.q_token, cmp_ratio);
             if constexpr (ModeConfig::Mode == QsmlaMode::HCA) {
-                // HCA is continuous compressed attention. Sparse CMP inputs
-                // are intentionally ignored; [0,cmp_valid_end) participates.
                 cmp_count = cmp_valid_end;
             } else {
                 const std::size_t list_offset =
@@ -187,7 +211,7 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                     * ModeConfig::CmpTopK;
                 const std::size_t length_offset =
                     (static_cast<std::size_t>(work.batch) * Config::S1
-                     + work.q_token) * Config::N2 + work.kv_head;
+                      + work.q_token) * Config::N2 + work.kv_head;
                 int candidate_count = ModeConfig::CmpTopK;
                 if (cmp_topk_length != nullptr) {
                     candidate_count = cmp_topk_length[length_offset];
@@ -211,9 +235,6 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                            : selected[logical_begin + row])
                     : 0;
                 if constexpr (std::is_same_v<kvdtype, __hif8>) {
-                    // The LinxV5 backend cannot legalize divergent scalar
-                    // i8/HIF8 copies. Preserve the raw HIF8 payload and gather
-                    // four elements per uint32 carrier instead.
                     auto* destination = reinterpret_cast<uint32_t*>(
                         kv_tile_buf + row * Config::D);
                     auto* source_words = reinterpret_cast<const uint32_t*>(
@@ -241,15 +262,13 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
             }
         };
 
-        tileMax tMax;
-        tileSum tSum;
+        // Dynamic tileMax/tileSum: valid rows set at construction.
+        tileMax tMax(kPeRows);
+        tileSum tSum(kPeRows);
         TEXPANDS(tMax, -1e30f);
         TEXPANDS(tSum, 0.0f);
         auto gMaxState = gIterMax(0, 0);
         auto gSumState = gIterSum(0, 0);
-        // Scalar indexed gather makes implicit Tile spills compiler-dependent.
-        // Persist the one shared m/l state explicitly between source blocks;
-        // gScore may overwrite these slots only after both states are loaded.
         TSTORE(gMaxState, tMax);
         TSTORE(gSumState, tSum);
 
@@ -268,9 +287,6 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                         allow_direct, selected != nullptr, valid_rows, kTk);
                 kvdtype* tile_ptr = kv_tile_buf;
                 if (direct_contiguous) {
-                    // A full contiguous ORI/HCA tile can be consumed from GM
-                    // directly. Indexed tiles and the non-integral tail keep
-                    // using the bounded gather buffer to avoid over-reading.
                     tile_ptr = source +
                         (range_begin + logical_begin) * Config::D;
                 } else {
@@ -280,8 +296,8 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 build_source_mask(valid_rows);
                 itK gIterK(tile_ptr);
 
-                tileMax tMax;
-                tileSum tSum;
+                tileMax tMax(kPeRows);
+                tileSum tSum(kPeRows);
                 TLOAD(tMax, gMaxState);
                 TLOAD(tSum, gSumState);
 
@@ -305,29 +321,34 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 }
 
                 TSTORE_CUBE(gScore, tScoreCube);
-                tileW tW;
+
+                // Dynamic tileW: ValidCol = valid_rows (actual KV tokens).
+                // TROWMAX / TROWSUM below operate on the true geometry —
+                // the register-form B.DIM tells the hardware how many
+                // columns are meaningful.
+                tileW tW(kPeRows, valid_rows);
                 TLOAD(tW, gScore);
                 TMULS(tW, tW, score_scale);
                 using gmMask = global_tensor<float, RowMajor<kPeRows, kTk>>;
                 using itMask = global_iterator<gmMask, tileMask>;
                 itMask gIterMask(mask_buf);
-                tileMask tMask;
+                tileMask tMask(kPeRows, valid_rows);
                 auto gMask = gIterMask(0, 0);
                 TLOAD(tMask, gMask);
                 TADD(tW, tW, tMask);
 
-                tileMax tLocalMax;
-                tileMax tNewMax;
+                tileMax tLocalMax(kPeRows);
+                tileMax tNewMax(kPeRows);
                 TROWMAX(tLocalMax, tW);
                 TMAX(tNewMax, tMax, tLocalMax);
-                tileMax tScale;
+                tileMax tScale(kPeRows);
                 TSUB(tScale, tMax, tNewMax);
                 TEXP(tScale, tScale);
-                tileSum tScaledOldSum;
+                tileSum tScaledOldSum(kPeRows);
                 TMUL(tScaledOldSum, tSum, tScale);
                 TROWEXPANDSUB(tW, tW, tNewMax);
                 TEXP(tW, tW);
-                tileSum tLocalSum;
+                tileSum tLocalSum(kPeRows);
                 TROWSUM(tLocalSum, tW);
                 TADD(tSum, tScaledOldSum, tLocalSum);
                 tMax = tNewMax;
@@ -336,12 +357,10 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
             }
         };
 
-        // visit_ori_pass1: ORI is always the first logical source.
         visit_source_pass1(
             work_ori,
             ModeConfig::HasIndexedOri ? ori_selected : nullptr,
             ori_begin, ori_count, true, ori_kv_descale);
-        // visit_cmp_pass1: CMP continues the same tMax/tSum state.
         if constexpr (ModeConfig::HasCmp) {
             visit_source_pass1(
                 work_cmp,
@@ -349,18 +368,15 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 0, cmp_count, false, cmp_kv_descale);
         }
 
-        tileSum tFinalSum;
+        tileSum tFinalSum(kPeRows);
         TLOAD(tFinalSum, gSumState);
-        tileSum tInvSum;
+        tileSum tInvSum(kPeRows);
         TRECIP(tInvSum, tFinalSum);
         TSTORE(gSumState, tInvSum);
 
-        // Keep the complete FP32 O state in GM. Only one [PeRows,Td] tile is
-        // live locally, so loop interchange does not recreate one-pass tile
-        // pressure.
 #pragma clang loop unroll(disable)
         for (int out_dd = 0; out_dd < kDb; ++out_dd) {
-            tileO tZeroO;
+            tileO tZeroO(kPeRows, kTd);
             TEXPANDS(tZeroO, 0.0f);
             auto gOState = gIterPV(0, out_dd);
             TSTORE(gOState, tZeroO);
@@ -395,8 +411,8 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 itK gIterK(tile_ptr);
                 itV gIterV(tile_ptr);
 
-                tileMax tMax;
-                tileSum tInvSum;
+                tileMax tMax(kPeRows);
+                tileSum tInvSum(kPeRows);
                 TLOAD(tMax, gMaxState);
                 TLOAD(tInvSum, gSumState);
 
@@ -420,14 +436,16 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 }
 
                 TSTORE_CUBE(gScore, tScoreCube);
-                tileW tW;
+
+                // Dynamic tileW with actual valid token count.
+                tileW tW(kPeRows, valid_rows);
                 TLOAD(tW, gScore);
                 TMULS(tW, tW, score_scale);
                 using gmMask =
                     global_tensor<float, RowMajor<kPeRows, kTk>>;
                 using itMask = global_iterator<gmMask, tileMask>;
                 itMask gIterMask(mask_buf);
-                tileMask tMask;
+                tileMask tMask(kPeRows, valid_rows);
                 auto gMask = gIterMask(0, 0);
                 TLOAD(tMask, gMask);
                 TADD(tW, tW, tMask);
@@ -435,30 +453,23 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                 TEXP(tW, tW);
                 TROWEXPANDMUL(tW, tW, tInvSum);
                 if constexpr (kUseHif8Probability) {
-                    // The original QSMLA contract quantizes P*16 to HIF8,
-                    // performs the second CUBE matmul, then removes 16 once
-                    // at final output. Online l remains the unquantized sum.
                     TMULS(tW, tW, kHif8ProbabilityScale);
                 }
 
-                tilePShard tPShard;
+                // Dynamic tilePShard with actual valid token count.
+                tilePShard tPShard(kPeRows, valid_rows);
                 TCVT(tPShard, tW);
                 auto gProbShard = gIterProb(pe_id, 0);
                 TSTORE(gProbShard, tPShard);
 
-                // gScore aliases the row-state backing store. Restore it once
-                // after probability generation, before the next source block.
                 TSTORE(gMaxState, tMax);
                 TSTORE(gSumState, tInvSum);
 
 #pragma clang loop unroll(disable)
                 for (int out_dd = 0; out_dd < kDb; ++out_dd) {
                     auto gOState = gIterPV(0, out_dd);
-                    tileO tO;
+                    tileO tO(kPeRows, kTd);
                     TLOAD(tO, gOState);
-                    // Shared CUBE operands must not remain live across a
-                    // runtime loop: reload the already-published P payload
-                    // into a short-lived tile for each D block.
                     tilePShared tPShared;
                     auto gP = gIterP(0, 0);
                     TLOAD<tilePMatrix, 1>(tPShared, gP);
@@ -469,7 +480,7 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
                     TMATMUL(tPVCube, tPShared, tVShared,
                             fixp::keep_acc().transpose_b());
                     TSTORE_CUBE(gOState, tPVCube);
-                    tileO tPV;
+                    tileO tPV(kPeRows, kTd);
                     TLOAD(tPV, gOState);
                     TMULS(tPV, tPV, kv_descale);
                     TADD(tO, tO, tPV);
@@ -478,13 +489,11 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
             }
         };
 
-        // visit_ori_pass2: preserve the pass-1 ORI then CMP source order.
         visit_source_pass2(
             work_ori,
             ModeConfig::HasIndexedOri ? ori_selected : nullptr,
             ori_begin, ori_count, true, ori_kv_descale);
         if constexpr (ModeConfig::HasCmp) {
-            // visit_cmp_pass2: continue into the same FP32 O scratch.
             visit_source_pass2(
                 work_cmp,
                 ModeConfig::HasIndexedCmp ? cmp_selected : nullptr,
@@ -494,13 +503,13 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
 #pragma clang loop unroll(disable)
         for (int out_dd = 0; out_dd < kDb; ++out_dd) {
             auto gOState = gIterPV(0, out_dd);
-            tileO tFinalO;
+            tileO tFinalO(kPeRows, kTd);
             TLOAD(tFinalO, gOState);
             if constexpr (kUseHif8Probability) {
                 TMULS(tFinalO, tFinalO,
                       1.0f / kHif8ProbabilityScale);
             }
-            tileOCast tOCast;
+            tileOCast tOCast(kPeRows, kTd);
             TCVT(tOCast, tFinalO);
             itO gIterO(out_ptr + work_out_offset
                        + pe_id * kPeRows * Config::D);
@@ -510,4 +519,4 @@ void quant_sparse_flash_mla_tadd_4pe_bsnd_pto(
     }
 }
 
-#endif // QUANT_SPARSE_FLASH_MLA_HPP
+#endif // QUANT_SPARSE_FLASH_MLA_V2_HPP
