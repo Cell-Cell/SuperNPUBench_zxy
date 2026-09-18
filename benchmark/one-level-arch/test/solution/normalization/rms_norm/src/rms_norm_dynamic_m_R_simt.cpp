@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "fileop.h"
-#include "solution/normalization/rms_norm/rms_norm_dynamic_m_R_tree.hpp"
+#include "solution/normalization/rms_norm/rms_norm_dynamic_m_R_simt.hpp"
 
 #ifndef DType
 #define DType __half
@@ -20,7 +20,7 @@
 #endif
 
 namespace {
-struct RTreeTilingData { int64_t g_a; int64_t g_r; int64_t powR; int64_t tile_a; int64_t tile_r; };
+struct SimtTilingData { int64_t g_a; int64_t g_r; int64_t powR; int64_t tile_a; int64_t tile_r; };
 constexpr int64_t rms_tile_a(int64_t global_a, int64_t pe_num) {
     return global_a > 0 && pe_num > 0 ? 1 : 0;
 }
@@ -53,7 +53,7 @@ int main() {
     constexpr int64_t kTileR = rms_tile_r(G_R);
     static_assert(G_A > 0 && G_R > 0);
     static_assert(kTileA > 0 && kTileR > 0 && kTileR <= 512);
-    RTreeTilingData tiling_info = {
+    SimtTilingData tiling_info = {
         G_A, G_R, kPowR, kTileA, kTileR};
 
     const int64_t g_a = tiling_info.g_a;
@@ -83,7 +83,7 @@ int main() {
     }
 #endif
 
-    rms_norm_dynamic_m_R_tree<dtype, PE_NUM>(input, gamma, &tiling_info, output);
+    rms_norm_dynamic_m_R_simt<dtype, PE_NUM>(input, gamma, &tiling_info, output);
 
 #ifdef RES_CHECK
     kernel_done[tid] = 1;

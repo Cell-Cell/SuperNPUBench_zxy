@@ -1,13 +1,13 @@
-// rms_norm_dynamic_m_R_tree: [512,8192].
+// rms_norm_dynamic_m_R_simt: [512,8192].
 // Fixed-shape 4PE implementation with R=[16,32,16], Tile=[32,16].
-#ifndef SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_TREE_HPP
-#define SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_TREE_HPP
+#ifndef SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_SIMT_HPP
+#define SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_SIMT_HPP
 
 #include <common/pto_tileop.hpp>
 
 #include <cstdint>
 
-namespace rms_detail_simt_dynamic_m_R_tree {
+namespace rms_detail_simt_dynamic_m_R_simt {
 
 constexpr float kEpsilon = 1e-6f;
 
@@ -41,20 +41,24 @@ __attribute__((always_inline)) inline void rsqrt_regbase(TileVec &out,
     body(recip, y, tmp);
 }
 
-template <typename gm_t, typename tile_h, typename tile_f, typename parent_t>
-inline void reduce_pairs(gm_t &base, int64_t gR, int64_t pair_count, int64_t tile_elems, int64_t tile_m, int64_t tile_r, parent_t &partial_matrix) {
-    for (int64_t pair = 0; pair < pair_count; ++pair) {
-        gm_t g0(base.data() + pair * tile_elems, static_cast<int>(tile_m), static_cast<int>(tile_r));
-        gm_t g1(base.data() + (pair + pair_count) * tile_elems, static_cast<int>(tile_m), static_cast<int>(tile_r));
-        tile_h h0(tile_m, tile_r), h1(tile_m, tile_r);
-        tile_f x0(tile_m, tile_r), x1(tile_m, tile_r), sq0(tile_m, tile_r), sq1(tile_m, tile_r), sq_pair(tile_m, tile_r);
-        TLOAD(h0, g0); TCVT(x0, h0); TMUL(sq0, x0, x0);
-        TLOAD(h1, g1); TCVT(x1, h1); TMUL(sq1, x1, x1);
-        TADD(sq_pair, sq0, sq1);
-        if (pair == 0) { auto rows = pto::range::assemble<1>(partial_matrix, pair); TROWSUM(rows, sq_pair); }
-        else if (pair + 1 == pair_count) { auto rows = pto::range::assemble_last<1>(partial_matrix, pair); TROWSUM_ASS(rows, sq_pair); }
-        else { auto rows = pto::range::assemble_middle<1>(partial_matrix, pair); TROWSUM_ASS(rows, sq_pair); }
+template <typename gm_t, typename tile_h, typename tile_f, typename tile_m_v>
+inline void reduce_sequential(gm_t &base, int64_t pair_count,
+                              int64_t tile_elems, int64_t tile_m,
+                              int64_t tile_r, tile_m_v &sum_rows) {
+    tile_f accum(tile_m, tile_r);
+    TEXPANDS(accum, 0.0f);
+    const int64_t block_count = pair_count * 2;
+    for (int64_t block = 0; block < block_count; ++block) {
+        gm_t g(base.data() + block * tile_elems, static_cast<int>(tile_m),
+               static_cast<int>(tile_r));
+        tile_h h(tile_m, tile_r);
+        tile_f x(tile_m, tile_r), squared(tile_m, tile_r);
+        TLOAD(h, g);
+        TCVT(x, h);
+        TMUL(squared, x, x);
+        TADD(accum, accum, squared);
     }
+    TROWSUM(sum_rows, accum);
 }
 
 template <typename dtype, typename gm_t, typename tile_h, typename tile_f,
@@ -68,21 +72,17 @@ inline void rms_norm_tile(dtype *x, const dtype *gamma, dtype *out,
     const int64_t tile_elems = tile_m * tile_r;
     gm_t input_row(x + offset, 1, static_cast<int>(gR));
 
-    // First pair outer-R blocks (0,8), (1,9), ... (7,15). Assemble the
-    // eight reduced [32,1] results by columns into one [32,8] Tile.
-    tile_m_matrix partial_matrix(tile_m, pair_count);
-    reduce_pairs<gm_t, tile_h, tile_f, tile_m_matrix>(
-        input_row, gR, pair_count, tile_elems, tile_m, tile_r, partial_matrix);
-
-    tile_m_v sum_rows(tile_m, 1);
-    TROWSUM(sum_rows, partial_matrix);
+    // Sequentially reduce every R block into one row-sum vector.
+    tile_m_v sum_rows(tile_m);
+    reduce_sequential<gm_t, tile_h, tile_f, tile_m_v>(
+        input_row, pair_count, tile_elems, tile_m, tile_r, sum_rows);
     tile_s tile_sum, mean, denom, rms;
     TCOLSUM(tile_sum, sum_rows);
     TMULS(mean, tile_sum, inv_r);
     TADDS(denom, mean, kEpsilon);
     rsqrt_regbase(rms, denom);
 
-    tile_v rms_rows(tile_m, 1);
+    tile_v rms_rows(tile_m);
     TCOLEXPAND(rms_rows, rms);
     for (int64_t r = 0; r < gR; r += tile_elems) {
         gm_t gi(x + offset + r, static_cast<int>(tile_m),
@@ -104,10 +104,10 @@ inline void rms_norm_tile(dtype *x, const dtype *gamma, dtype *out,
     }
 }
 
-} // namespace rms_detail_simt_dynamic_m_R_tree
+} // namespace rms_detail_simt_dynamic_m_R_simt
 
 template <typename dtype, int peNum, typename TilingData>
-void rms_norm_dynamic_m_R_tree(dtype *x, const dtype *gamma, const TilingData *tiling, dtype *out) {
+void rms_norm_dynamic_m_R_simt(dtype *x, const dtype *gamma, const TilingData *tiling, dtype *out) {
     static_assert(peNum == 4, "normalization kernels support only 4PE");
 
     const int64_t globalA = tiling->g_a;
@@ -149,16 +149,12 @@ void rms_norm_dynamic_m_R_tree(dtype *x, const dtype *gamma, const TilingData *t
                         BLayout::RowMajor, 1, 1>;
 
     const float inv_r = 1.0f / static_cast<float>(gR);
-    for (int64_t ia = 0; ia < peA; ia += tile_m) {
-        int64_t cur_tile_m = tile_m;
-        if (ia + cur_tile_m > peA) {
-            cur_tile_m = peA - ia;
-        }
-        rms_detail_simt_dynamic_m_R_tree::rms_norm_tile<
+    for (int64_t ia = 0; ia < peA; ++ia) {
+        rms_detail_simt_dynamic_m_R_simt::rms_norm_tile<
             dtype, gm_t, tile_h, tile_f, tile_m_v, tile_m_matrix, tile_v,
             tile_s>(
-            x, gamma, out, gR, pair_count, ia, cur_tile_m, tile_r, inv_r);
+            x, gamma, out, gR, pair_count, ia, tile_m, tile_r, inv_r);
     }
 }
 
-#endif // SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_TREE_HPP
+#endif // SUPERNPU_RMS_NORM_SIMT_DYNAMIC_M_R_SIMT_HPP
