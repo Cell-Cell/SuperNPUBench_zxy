@@ -6,6 +6,10 @@
 # subsequent shape groups (fixpipe, subview, long-context).
 : "${COMPILER_DIR:?Set COMPILER_DIR to the Linx compiler bin directory}"
 
+# fa_gmma_dynamic keeps Q and online-softmax/PV tile state across a runtime
+# KV loop. The current compiler crashes in Simple Register Coalescing, so this
+# experimental testcase is built separately while that issue is investigated.
+
 # fa_gmma_kchains runs the SAME shape/mode matrix as fa_2d_unroll_gmma: the
 # Makefile defaults PVChainK=32 and auto-appends _PVChainK32 to its ELF name;
 # X_dim/Y_dim are name-only for kchains (its kernel does not stage multi-tiles).
