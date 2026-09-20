@@ -1,0 +1,48 @@
+/tmp/opencode/ssm-main/bin/gfsim -f /tmp/opencode/pr163/benchmark/one-level-arch/output/solution/group_token_vec/elf/solution_group_token_vec_group_token_vec_mt_dyn.elf -s core.threadCount=4 core.vec_core_num=4 
+[gfsim] ELF auto-detect: single-PE; using default config
+Override configurations:
+core.threadCount=4
+core.vec_core_num=4
+Memory: 0x10200 - 0x10248 (Size=0KB) [.rodata]
+Memory: 0x1024c - 0x1025f (Size=0KB) [.eh_frame_hdr]
+Memory: 0x10260 - 0x102ab (Size=0KB) [.eh_frame]
+Memory: 0x112ac - 0x12403 (Size=4KB) [.text]
+Memory: 0x13408 - 0x1341f (Size=0KB) [.init_array]
+Memory: 0x13420 - 0x13437 (Size=0KB) [.data.rel.ro]
+Memory: 0x14438 - 0x35213 (Size=131KB) [.bss]
+Memory: 0x35218 - 0x3522f (Size=0KB) [.sbss]
+Memory: 0x35230 - 0x8045230 (Size=131136KB) [stack mem]
+Memory: 0x4000802000 - 0x4008803000 (Size=131076KB) [map mem]
+tid: 0 Core@100000: Retired blocks 30855. BROB head info: B10 STID0 BPC 0x113ca [STD COND]
+tid: 1 Core@100000: Retired blocks 30855. BROB head info: B33 STID1 BPC 0x113ca [STD COND]
+tid: 2 Core@100000: Retired blocks 30855. BROB head info: B50 STID2 BPC 0x113ca [STD COND]
+tid: 3 Core@100000: Retired blocks 30855. BROB head info: B42 STID3 BPC 0x113ca [STD COND]
+[C:125016 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704649 pending=0
+[C:125281 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704650 pending=0
+[C:127570 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704651 pending=0
+[C:127855 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704652 pending=0
+[C:132742 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704654 pending=0
+[C:133075 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704675 pending=0
+[C:158991 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704691 pending=0
+[C:159316 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704693 pending=0
+[C:159640 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704695 pending=0
+tid: 0 Core@200000: Retired blocks 86552. BROB head info: B134 STID0 BPC 0x1175e [STD COND]
+tid: 1 Core@200000: Retired blocks 86552. BROB head info: B134 STID1 BPC 0x1175e [STD COND]
+tid: 2 Core@200000: Retired blocks 86552. BROB head info: B134 STID2 BPC 0x1175e [STD COND]
+tid: 3 Core@200000: Retired blocks 86552. BROB head info: B134 STID3 BPC 0x1175e [STD COND]
+tid: 0 Core@300000: Retired blocks 166552. BROB head info: B166 STID0 BPC 0x1175e [STD COND]
+tid: 1 Core@300000: Retired blocks 166552. BROB head info: B166 STID1 BPC 0x1175e [STD COND]
+tid: 2 Core@300000: Retired blocks 166552. BROB head info: B166 STID2 BPC 0x1175e [STD COND]
+tid: 3 Core@300000: Retired blocks 166552. BROB head info: B166 STID3 BPC 0x1175e [STD COND]
+tid: 0 Core@400000: Retired blocks 246552. BROB head info: B198 STID0 BPC 0x1175e [STD COND]
+tid: 1 Core@400000: Retired blocks 246552. BROB head info: B198 STID1 BPC 0x1175e [STD COND]
+tid: 2 Core@400000: Retired blocks 246552. BROB head info: B198 STID2 BPC 0x1175e [STD COND]
+tid: 3 Core@400000: Retired blocks 246552. BROB head info: B198 STID3 BPC 0x1175e [STD COND]
+tid: 0 Core@500000: Retired blocks 326552. BROB head info: B230 STID0 BPC 0x1175e [STD COND]
+tid: 1 Core@500000: Retired blocks 326552. BROB head info: B230 STID1 BPC 0x1175e [STD COND]
+tid: 2 Core@500000: Retired blocks 326552. BROB head info: B230 STID2 BPC 0x1175e [STD COND]
+tid: 3 Core@500000: Retired blocks 326552. BROB head info: B230 STID3 BPC 0x1175e [STD COND]
+tid: 0 Core@600000: Retired blocks 406552. BROB head info: B6 STID0 BPC 0x1175e [STD COND]
+tid: 1 Core@600000: Retired blocks 406552. BROB head info: B6 STID1 BPC 0x1175e [STD COND]
+tid: 2 Core@600000: Retired blocks 406552. BROB head info: B6 STID2 BPC 0x1175e [STD COND]
+tid: 3 Core@600000: Retired blocks 406552. BROB head info: B6 STID3 BPC 0x1175e [STD COND]

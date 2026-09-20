@@ -1,0 +1,153 @@
+./bin/gfsim -f /tmp/opencode/pr163/benchmark/one-level-arch/output/solution/group_token_vec/elf/solution_group_token_vec_group_token_vec_mt_dyn.elf --conf fourpe 
+[gfsim] explicit PE config present; skipping ELF auto-detection
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Override configurations:
+core.threadCount=4
+core.stdPeCount=1
+core.cube_core_num=4
+core.cube_thread_num=1
+core.vec_core_num=4
+fourpe.pe_cluster_enable=true
+fourpe.pe_cluster_count=4
+fourpe.pe_cluster_frontend_thread_count=4
+fourpe.pe_cluster_aggregate_decode_width=8
+fourpe.pe_cluster_gpr_rename_partition_entries=128
+fourpe.pe_cluster_scalar_rob_partition_entries=128
+fourpe.pe_cluster_scalar_iq_partition_entries=128
+fourpe.pe_cluster_block_rob_partition_entries=256
+fourpe.pe_cluster_block_iq_partition_entries=88
+fourpe.pe_cluster_local_reg_partition_entries=88
+bfu.brq_depth=1024
+fourpe.pe_cluster_partition_borrow_enable=false
+fourpe.pe_cluster_eligible_rr_fairness_check=true
+fourpe.pe_cluster_group_contract_fatal=false
+dfx.swimCounterSampleInterval=8
+Memory: 0x10200 - 0x10248 (Size=0KB) [.rodata]
+Memory: 0x1024c - 0x1025f (Size=0KB) [.eh_frame_hdr]
+Memory: 0x10260 - 0x102ab (Size=0KB) [.eh_frame]
+Memory: 0x112ac - 0x12403 (Size=4KB) [.text]
+Memory: 0x13408 - 0x1341f (Size=0KB) [.init_array]
+Memory: 0x13420 - 0x13437 (Size=0KB) [.data.rel.ro]
+Memory: 0x14438 - 0x35213 (Size=131KB) [.bss]
+Memory: 0x35218 - 0x3522f (Size=0KB) [.sbss]
+Memory: 0x35230 - 0x8045230 (Size=131136KB) [stack mem]
+Memory: 0x4000802000 - 0x4008803000 (Size=131076KB) [map mem]
+tid: 0 Core@100000: Retired blocks 30731. BROB head info: B247 STID0 BPC 0x113ca [STD COND]
+tid: 1 Core@100000: Retired blocks 30731. BROB head info: B255 STID1 BPC 0x113ca [STD COND]
+tid: 2 Core@100000: Retired blocks 30731. BROB head info: B20 STID2 BPC 0x113ca [STD COND]
+tid: 3 Core@100000: Retired blocks 30731. BROB head info: B1 STID3 BPC 0x113ca [STD COND]
+[C:125291 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704649 pending=0
+[C:125576 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704650 pending=0
+[C:127794 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704651 pending=0
+[C:128112 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704652 pending=0
+[C:132904 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704654 pending=0
+[C:133460 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704678 pending=0
+[C:158954 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704691 pending=0
+[C:159230 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704693 pending=0
+[C:159569 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704695 pending=0
+tid: 0 Core@200000: Retired blocks 86705. BROB head info: B173 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@200000: Retired blocks 86705. BROB head info: B173 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@200000: Retired blocks 86705. BROB head info: B172 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@200000: Retired blocks 86705. BROB head info: B171 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@300000: Retired blocks 166705. BROB head info: B205 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@300000: Retired blocks 166705. BROB head info: B205 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@300000: Retired blocks 166705. BROB head info: B204 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@300000: Retired blocks 166705. BROB head info: B203 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@400000: Retired blocks 246705. BROB head info: B237 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@400000: Retired blocks 246705. BROB head info: B237 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@400000: Retired blocks 246705. BROB head info: B236 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@400000: Retired blocks 246705. BROB head info: B235 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@500000: Retired blocks 326705. BROB head info: B13 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@500000: Retired blocks 326705. BROB head info: B13 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@500000: Retired blocks 326705. BROB head info: B12 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@500000: Retired blocks 326705. BROB head info: B11 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@600000: Retired blocks 406705. BROB head info: B45 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@600000: Retired blocks 406705. BROB head info: B45 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@600000: Retired blocks 406705. BROB head info: B44 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@600000: Retired blocks 406705. BROB head info: B43 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@700000: Retired blocks 486705. BROB head info: B77 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@700000: Retired blocks 486705. BROB head info: B77 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@700000: Retired blocks 486705. BROB head info: B76 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@700000: Retired blocks 486705. BROB head info: B75 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@800000: Retired blocks 566705. BROB head info: B109 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@800000: Retired blocks 566705. BROB head info: B109 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@800000: Retired blocks 566705. BROB head info: B108 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@800000: Retired blocks 566705. BROB head info: B107 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@900000: Retired blocks 646705. BROB head info: B141 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@900000: Retired blocks 646705. BROB head info: B141 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@900000: Retired blocks 646705. BROB head info: B140 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@900000: Retired blocks 646705. BROB head info: B139 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@1000000: Retired blocks 726705. BROB head info: B173 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@1000000: Retired blocks 726705. BROB head info: B173 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@1000000: Retired blocks 726705. BROB head info: B172 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@1000000: Retired blocks 726705. BROB head info: B171 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@1100000: Retired blocks 806705. BROB head info: B205 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@1100000: Retired blocks 806705. BROB head info: B205 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@1100000: Retired blocks 806705. BROB head info: B204 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@1100000: Retired blocks 806705. BROB head info: B203 STID3 BPC 0x1176a [STD COND]
+tid: 0 Core@1200000: Retired blocks 886705. BROB head info: B237 STID0 BPC 0x1176a [STD COND]
+tid: 1 Core@1200000: Retired blocks 886705. BROB head info: B237 STID1 BPC 0x1176a [STD COND]
+tid: 2 Core@1200000: Retired blocks 886705. BROB head info: B236 STID2 BPC 0x1176a [STD COND]
+tid: 3 Core@1200000: Retired blocks 886705. BROB head info: B235 STID3 BPC 0x1176a [STD COND]

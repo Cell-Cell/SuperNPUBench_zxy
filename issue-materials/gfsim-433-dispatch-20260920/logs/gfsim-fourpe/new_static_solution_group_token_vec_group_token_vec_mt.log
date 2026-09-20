@@ -1,0 +1,550 @@
+./bin/gfsim -f /tmp/opencode/pr163/benchmark/one-level-arch/output/solution/group_token_vec/elf/solution_group_token_vec_group_token_vec_mt.elf --conf fourpe 
+[gfsim] explicit PE config present; skipping ELF auto-detection
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Override configurations:
+core.threadCount=4
+core.stdPeCount=1
+core.cube_core_num=4
+core.cube_thread_num=1
+core.vec_core_num=4
+fourpe.pe_cluster_enable=true
+fourpe.pe_cluster_count=4
+fourpe.pe_cluster_frontend_thread_count=4
+fourpe.pe_cluster_aggregate_decode_width=8
+fourpe.pe_cluster_gpr_rename_partition_entries=128
+fourpe.pe_cluster_scalar_rob_partition_entries=128
+fourpe.pe_cluster_scalar_iq_partition_entries=128
+fourpe.pe_cluster_block_rob_partition_entries=256
+fourpe.pe_cluster_block_iq_partition_entries=88
+fourpe.pe_cluster_local_reg_partition_entries=88
+bfu.brq_depth=1024
+fourpe.pe_cluster_partition_borrow_enable=false
+fourpe.pe_cluster_eligible_rr_fairness_check=true
+fourpe.pe_cluster_group_contract_fatal=false
+dfx.swimCounterSampleInterval=8
+Memory: 0x10200 - 0x10248 (Size=0KB) [.rodata]
+Memory: 0x1024c - 0x1025f (Size=0KB) [.eh_frame_hdr]
+Memory: 0x10260 - 0x102ab (Size=0KB) [.eh_frame]
+Memory: 0x112ac - 0x12247 (Size=3KB) [.text]
+Memory: 0x13248 - 0x13267 (Size=0KB) [.init_array]
+Memory: 0x13268 - 0x1327f (Size=0KB) [.data.rel.ro]
+Memory: 0x14280 - 0x2df7b (Size=103KB) [.bss]
+Memory: 0x2df80 - 0x2df9f (Size=0KB) [.sbss]
+Memory: 0x2dfa0 - 0x803dfa0 (Size=131136KB) [stack mem]
+Memory: 0x4000802000 - 0x4008803000 (Size=131076KB) [map mem]
+tid: 0 Core@100000: Retired blocks 1149. BROB head info: B31 STID0 BPC 0x112fc [STD COND]
+tid: 1 Core@100000: Retired blocks 1149. BROB head info: B31 STID1 BPC 0x112fc [STD COND]
+tid: 2 Core@100000: Retired blocks 1149. BROB head info: B31 STID2 BPC 0x112fc [STD COND]
+tid: 3 Core@100000: Retired blocks 1149. BROB head info: B32 STID3 BPC 0x112fc [STD COND]
+tid: 0 Core@200000: Retired blocks 12015. BROB head info: B189 STID0 BPC 0x11538 [STD COND]
+tid: 1 Core@200000: Retired blocks 12015. BROB head info: B189 STID1 BPC 0x11538 [STD COND]
+tid: 2 Core@200000: Retired blocks 12015. BROB head info: B184 STID2 BPC 0x1155e [STD DIRECT]
+tid: 3 Core@200000: Retired blocks 12015. BROB head info: B189 STID3 BPC 0x11538 [STD COND]
+[C:258218 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=230 younger_rid=230 older_bid=223 older_rid=223 younger_slot=4 older_slot=1
+[C:258264 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=237 younger_rid=237 older_bid=230 older_rid=230 younger_slot=3 older_slot=4
+[C:258454 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=2 younger_rid=2 older_bid=251 older_rid=251 younger_slot=2 older_slot=1
+[C:258516 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=9 younger_rid=9 older_bid=2 older_rid=2 younger_slot=1 older_slot=2
+[C:258532 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=16 younger_rid=16 older_bid=9 older_rid=9 younger_slot=3 older_slot=1
+[C:258644 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=23 younger_rid=23 older_bid=16 older_rid=16 younger_slot=1 older_slot=3
+[C:258738 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=30 younger_rid=30 older_bid=23 older_rid=23 younger_slot=0 older_slot=1
+[C:258770 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=37 younger_rid=37 older_bid=30 older_rid=30 younger_slot=5 older_slot=0
+[C:258802 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=44 younger_rid=44 older_bid=37 older_rid=37 younger_slot=6 older_slot=5
+[C:258850 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=51 younger_rid=51 older_bid=44 older_rid=44 younger_slot=8 older_slot=6
+[C:258912 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=58 younger_rid=58 older_bid=51 older_rid=51 younger_slot=5 older_slot=8
+[C:258976 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=65 younger_rid=65 older_bid=58 older_rid=58 younger_slot=2 older_slot=5
+[C:259056 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=72 younger_rid=72 older_bid=65 older_rid=65 younger_slot=1 older_slot=2
+[C:259120 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=79 younger_rid=79 older_bid=72 older_rid=72 younger_slot=7 older_slot=1
+[C:259166 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=86 younger_rid=86 older_bid=79 older_rid=79 younger_slot=4 older_slot=7
+[C:259214 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=93 younger_rid=93 older_bid=86 older_rid=86 younger_slot=3 older_slot=4
+[C:259276 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=100 younger_rid=100 older_bid=93 older_rid=93 younger_slot=5 older_slot=3
+[C:259308 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=107 younger_rid=107 older_bid=100 older_rid=100 younger_slot=9 older_slot=5
+[C:259372 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=114 younger_rid=114 older_bid=107 older_rid=107 younger_slot=4 older_slot=9
+[C:259450 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=121 younger_rid=121 older_bid=114 older_rid=114 younger_slot=3 older_slot=4
+[C:259508 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=128 younger_rid=128 older_bid=121 older_rid=121 younger_slot=6 older_slot=3
+[C:297099 ][DFX.NA    ]: Deadlock detected at thread 1, cycles=297100, waitCycles exceeded threshold, verified blocks=11564, verified minsts=0
+[C:297099 ][BCC.STAGE ]: ==================================================
+[C:297099 ][BCC.STAGE ]: size: 5 commitPtr: 19 nonFlushBid: 20 allocPtr: 24
+[C:297099 ][BCC.STAGE ]: 	|--B19 STID0 BPC 0x11b8a [STD COND] STD completed<- oldest/commitPtr
+[C:297099 ][BCC.STAGE ]: 	|--B20 STID0 BPC 0x11b98 [STD DIRECT] STD allocated<- nonFlushBid
+[C:297099 ][BCC.STAGE ]: 	|--B21 STID0 BPC 0x11b7e [STD COND] STD allocated
+[C:297099 ][BCC.STAGE ]: 	|--B22 STID0 BPC 0x11b8a [STD COND] STD allocated
+[C:297099 ][BCC.STAGE ]: 	|--B23 STID0 BPC 0x11b98 [STD DIRECT] STD allocated
+[C:297099 ][BCC.STAGE ]: ==================================================
+B19 STID0 BPC 0x11b8a [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: ==================================================
+[C:297099 ][BCC.STAGE ]: size: 6 commitPtr: 44 nonFlushBid: 44 allocPtr: 50
+[C:297099 ][BCC.STAGE ]: 	|--B44 STID1 BPC 0x112b0 [STD FALL] STD terminate<- oldest/commitPtr<- nonFlushBid
+[C:297099 ][BCC.STAGE ]: 	|--B45 STID1 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B46 STID1 BPC 0x112c8 [STD DIRECT] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B47 STID1 BPC 0x112dc [STD RET] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B48 STID1 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][BCC.STAGE ]: 	|--B49 STID1 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: ==================================================
+B44 STID1 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][BCC.STAGE ]: ==================================================
+[C:297099 ][BCC.STAGE ]: size: 6 commitPtr: 33 nonFlushBid: 33 allocPtr: 39
+[C:297099 ][BCC.STAGE ]: 	|--B33 STID2 BPC 0x112b0 [STD FALL] STD terminate<- oldest/commitPtr<- nonFlushBid
+[C:297099 ][BCC.STAGE ]: 	|--B34 STID2 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B35 STID2 BPC 0x112c8 [STD DIRECT] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B36 STID2 BPC 0x112dc [STD RET] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B37 STID2 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][BCC.STAGE ]: 	|--B38 STID2 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: ==================================================
+B33 STID2 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][BCC.STAGE ]: ==================================================
+[C:297099 ][BCC.STAGE ]: size: 6 commitPtr: 41 nonFlushBid: 41 allocPtr: 47
+[C:297099 ][BCC.STAGE ]: 	|--B41 STID3 BPC 0x112b0 [STD FALL] STD terminate<- oldest/commitPtr<- nonFlushBid
+[C:297099 ][BCC.STAGE ]: 	|--B42 STID3 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B43 STID3 BPC 0x112c8 [STD DIRECT] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B44 STID3 BPC 0x112dc [STD RET] STD completed
+[C:297099 ][BCC.STAGE ]: 	|--B45 STID3 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][BCC.STAGE ]: 	|--B46 STID3 BPC 0x112bc [STD COND] STD completed
+[C:297099 ][BCC.STAGE ]: ==================================================
+B41 STID3 BPC 0x112b0 [STD FALL] STD terminate
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: PEID:0 tid:0, size 22 osdSize 19
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b98 P0-L0-(B20-)-G0-T0-I74-ST0  TR92-UR9 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x11b7e last: false retired top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b9a P0-L0-(B20-)-G0-T0-I75-ST0  TR92-UR9 sid:0 lsid:0 src0:98304,->dst0:t-P(156) data=0x29b9a,|addtpc 98304 -> t last: false retired top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b9e P0-L0-(B20-)-G0-T0-I76-ST0  TR93-UR9 sid:0 lsid:0 src0:t#1-P(156)-rdy data=0x29b9a,src1:0x14e,->dst0:t-P(157) data=0x29ce8,|addi t#1, 0x14e -> t last: false retired top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11ba2 P0-L0-(B20-)-G0-T0-I77-ST0  TR94-UR9 sid:0 lsid:0 src0:t#1-P(157)-rdy data=0x29ce8,src1:[a1<<2]-P(27)-rdy data=0x38,->dst0:t-P(158) data=0x0,|lw t#1, [a1<<2] -> t last: false in_queue top:free<- oldest
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11ba6 P0-L0-(B20-)-G0-T0-I78-ST0  TR95-UR9 sid:0 lsid:1 src0:t#1-P(158)-not_rdy,src1:1,->dst0:t-P(159),|c.addi t#1, 1 -> t last: false in_queue top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11ba8 P0-L0-(B20-)-G0-T0-I79-ST0  TR96-UR9 sid:13430 lsid:1 src0:t#1-P(159)-not_rdy,src1:t#3-P(157)-rdy,src2:[a1<<2]-P(27)-rdy,|sw t#1, t#3, [a1<<2] last: false issued top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11bac P0-L0-(B20-)-G0-T0-I80-ST0  TR96-UR9 sid:0 lsid:2 |BSTOP last: true completed top:free<- stop of B20
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b7e TPC:0x11b7e P0-L0-(B21-)-G0-T0-I81-ST0  TR96-UR9 sid:0 lsid:0|C.BSTART.STD COND, 0x11bac last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b7e TPC:0x11b80 P0-L0-(B21-)-G0-T0-I82-ST0  TR96-UR9 sid:0 lsid:0 src0:fp(s0)-P(4)-rdy data=0x1d8b,src1:0x1,->dst0:fp(s0)-P(7) data=0x1d8a,|subi fp(s0), 0x1 -> fp(s0) last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b7e TPC:0x11b84 P0-L0-(B21-)-G0-T0-I83-ST0  TR96-UR9 sid:0 lsid:0 src0:fp(s0)-P(7)-rdy data=0x1d8a,src1:zero data=0x0,|c.setc.eq fp(s0), zero last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b7e TPC:0x11b86 P0-L0-(B21-)-G0-T0-I84-ST0  TR96-UR9 sid:0 lsid:0 src0:a0-P(9)-rdy data=0x159d4,src1:0x4,->dst0:a0-P(28) data=0x159d8,|addi a0, 0x4 -> a0 last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b7e TPC:0x11b8a P0-L0-(B21-)-G0-T0-I85-ST0  TR96-UR9 sid:0 lsid:0 |BSTOP last: true completed top:free<- stop of B21
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b8a TPC:0x11b8a P0-L0-(B22-)-G0-T0-I86-ST0  TR96-UR9 sid:0 lsid:0|C.BSTART.STD COND, 0x11b7e last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b8a TPC:0x11b8c P0-L0-(B22-)-G0-T0-I87-ST0  TR96-UR9 sid:0 lsid:0 src0:a0-P(28)-rdy,src1:zero,->dst0:a1-P(29),|lwu a0, zero -> a1 last: false in_queue top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b8a TPC:0x11b90 P0-L0-(B22-)-G0-T0-I88-ST0  TR96-UR9 sid:0 lsid:1 src0:zero,src1:0x7f,->dst0:t-P(160),|addi zero, 0x7f -> t last: false in_queue top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b8a TPC:0x11b94 P0-L0-(B22-)-G0-T0-I89-ST0  TR97-UR9 sid:0 lsid:1 src0:t#1-P(160)-not_rdy,src1:a1-P(29)-not_rdy,|setc.ltu t#1, a1 last: false in_queue top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b8a TPC:0x11b98 P0-L0-(B22-)-G0-T0-I90-ST0  TR97-UR9 sid:0 lsid:1 |BSTOP last: true completed top:free<- stop of B22
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b98 P0-L0-(B23-)-G0-T0-I91-ST0  TR97-UR9 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x11b7e last: false completed top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b9a P0-L0-(B23-)-G0-T0-I92-ST0  TR0-UR0 sid:0 lsid:0 src0:98304,->dst0:t(!renamed),|addtpc 98304 -> t last: false alloc top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11b9e P0-L0-(B23-)-G0-T0-I93-ST0  TR0-UR0 sid:0 lsid:0 src0:t#1(!renamed),src1:0x14e,->dst0:t(!renamed),|addi t#1, 0x14e -> t last: false alloc top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11ba2 P0-L0-(B23-)-G0-T0-I94-ST0  TR0-UR0 sid:0 lsid:0 src0:t#1(!renamed),src1:[a1<<2](!renamed),->dst0:t(!renamed),|lw t#1, [a1<<2] -> t last: false alloc top:free
+[C:297099 ][SPE.STAGE ]: 	|-- BPC:0x11b98 TPC:0x11ba6 P0-L0-(B23-)-G0-T0-I95-ST0  TR0-UR0 sid:0 lsid:1 src0:t#1(!renamed),src1:1,->dst0:t(!renamed),|c.addi t#1, 1 -> t last: false alloc top:free
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: PEID:0 tid:1, size 0 osdSize 0
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: PEID:0 tid:2, size 0 osdSize 0
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297099 ][SPE.STAGE ]: PEID:0 tid:3, size 0 osdSize 0
+[C:297099 ][SPE.STAGE ]: ==================================================
+[C:297100  ][VEC.TOP  ]: ==================================================
+[C:297100  ][VEC.TOP  ]: VecTop pe=0 uopQ[INT] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=0 uopQ[FMA] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=0 uopQ[LNEXP] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: splitSlots N=4 pendingAdmit=0
+[C:297100  ][VEC.TOP  ]: vecEntries=0
+[C:297100  ][VEC.TOP  ]: srcBuf[INT] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[FMA] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[LNEXP] size=0 []
+[C:297100  ][VEC.TOP  ]: pipes alu=0 fma=0 lnexp=0 nextIssue[ALU0,ALU1,FPU,LNEXP,SHARED]=0,0,0,0,0
+[C:297100  ][VEC.TOP  ]: dstBuf[INT] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[FMA] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[LNEXP] size=0
+[C:297100  ][VEC.TOP  ]: pendingWrites=0
+[C:297100  ][VEC.TOP  ]: uopQ empty -- 卡点不在 uopQ ready 选择，可能块未切分（VecTop 未 ReceiveTileOp）或 SrcBuf/pipe 反压。
+[C:297100  ][VEC.TOP  ]: ==================================================
+[C:297100  ][VEC.TOP  ]: VecTop pe=1 uopQ[INT] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=1 uopQ[FMA] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=1 uopQ[LNEXP] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: splitSlots N=4 pendingAdmit=0
+[C:297100  ][VEC.TOP  ]: vecEntries=0
+[C:297100  ][VEC.TOP  ]: srcBuf[INT] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[FMA] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[LNEXP] size=0 []
+[C:297100  ][VEC.TOP  ]: pipes alu=0 fma=0 lnexp=0 nextIssue[ALU0,ALU1,FPU,LNEXP,SHARED]=0,0,0,0,0
+[C:297100  ][VEC.TOP  ]: dstBuf[INT] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[FMA] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[LNEXP] size=0
+[C:297100  ][VEC.TOP  ]: pendingWrites=0
+[C:297100  ][VEC.TOP  ]: uopQ empty -- 卡点不在 uopQ ready 选择，可能块未切分（VecTop 未 ReceiveTileOp）或 SrcBuf/pipe 反压。
+[C:297100  ][VEC.TOP  ]: ==================================================
+[C:297100  ][VEC.TOP  ]: VecTop pe=2 uopQ[INT] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=2 uopQ[FMA] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=2 uopQ[LNEXP] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: splitSlots N=4 pendingAdmit=0
+[C:297100  ][VEC.TOP  ]: vecEntries=0
+[C:297100  ][VEC.TOP  ]: srcBuf[INT] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[FMA] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[LNEXP] size=0 []
+[C:297100  ][VEC.TOP  ]: pipes alu=0 fma=0 lnexp=0 nextIssue[ALU0,ALU1,FPU,LNEXP,SHARED]=0,0,0,0,0
+[C:297100  ][VEC.TOP  ]: dstBuf[INT] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[FMA] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[LNEXP] size=0
+[C:297100  ][VEC.TOP  ]: pendingWrites=0
+[C:297100  ][VEC.TOP  ]: uopQ empty -- 卡点不在 uopQ ready 选择，可能块未切分（VecTop 未 ReceiveTileOp）或 SrcBuf/pipe 反压。
+[C:297100  ][VEC.TOP  ]: ==================================================
+[C:297100  ][VEC.TOP  ]: VecTop pe=3 uopQ[INT] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=3 uopQ[FMA] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: VecTop pe=3 uopQ[LNEXP] Size=0 Full=0 Empty=1 (headIsReady=-1)
+[C:297100  ][VEC.TOP  ]: splitSlots N=4 pendingAdmit=0
+[C:297100  ][VEC.TOP  ]: vecEntries=0
+[C:297100  ][VEC.TOP  ]: srcBuf[INT] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[FMA] size=0 []
+[C:297100  ][VEC.TOP  ]: srcBuf[LNEXP] size=0 []
+[C:297100  ][VEC.TOP  ]: pipes alu=0 fma=0 lnexp=0 nextIssue[ALU0,ALU1,FPU,LNEXP,SHARED]=0,0,0,0,0
+[C:297100  ][VEC.TOP  ]: dstBuf[INT] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[FMA] size=0
+[C:297100  ][VEC.TOP  ]: dstBuf[LNEXP] size=0
+[C:297100  ][VEC.TOP  ]: pendingWrites=0
+[C:297100  ][VEC.TOP  ]: uopQ empty -- 卡点不在 uopQ ready 选择，可能块未切分（VecTop 未 ReceiveTileOp）或 SrcBuf/pipe 反压。
+hand T deallocPtr:112 retirePtr:128 lastAllocPtr:128 allocPtr:128 size 240
+ Index 112 Entry vtag:112 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 113 Entry vtag:113 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 114 Entry vtag:114 ptag:2 occuiped size:2 addr:100 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 115 Entry vtag:115 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 116 Entry vtag:116 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 117 Entry vtag:117 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 118 Entry vtag:118 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 119 Entry vtag:119 ptag:2 occuiped size:2 addr:100 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 120 Entry vtag:120 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 121 Entry vtag:121 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 122 Entry vtag:122 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 123 Entry vtag:123 ptag:2 occuiped size:2 addr:100 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 124 Entry vtag:124 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 125 Entry vtag:125 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 126 Entry vtag:126 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 127 Entry vtag:127 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+hand U deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand M deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand N deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand STK deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+tileRegSize: 256
+totalTileSize: 262144
+allocatorFreeSize: 262144
+allocatorLargestFreeExtent: 262144
+T used size: 0
+U used size: 0
+M used size: 0
+N used size: 0
+STK used size: 0
+hand T deallocPtr:112 retirePtr:128 lastAllocPtr:128 allocPtr:128 size 240
+ Index 112 Entry vtag:112 ptag:28 occuiped size:2 addr:e00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 113 Entry vtag:113 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 114 Entry vtag:114 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 115 Entry vtag:115 ptag:24 occuiped size:2 addr:c00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 116 Entry vtag:116 ptag:14 occuiped size:2 addr:700 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 117 Entry vtag:117 ptag:22 occuiped size:2 addr:b00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 118 Entry vtag:118 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 119 Entry vtag:119 ptag:10 occuiped size:2 addr:500 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 120 Entry vtag:120 ptag:20 occuiped size:2 addr:a00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 121 Entry vtag:121 ptag:12 occuiped size:2 addr:600 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 122 Entry vtag:122 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 123 Entry vtag:123 ptag:18 occuiped size:2 addr:900 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 124 Entry vtag:124 ptag:26 occuiped size:2 addr:d00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 125 Entry vtag:125 ptag:30 occuiped size:2 addr:f00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 126 Entry vtag:126 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 127 Entry vtag:127 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+hand U deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand M deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand N deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand STK deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+tileRegSize: 256
+totalTileSize: 262144
+allocatorFreeSize: 262144
+allocatorLargestFreeExtent: 262144
+T used size: 0
+U used size: 0
+M used size: 0
+N used size: 0
+STK used size: 0
+hand T deallocPtr:112 retirePtr:128 lastAllocPtr:128 allocPtr:128 size 240
+ Index 112 Entry vtag:112 ptag:26 occuiped size:2 addr:d00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 113 Entry vtag:113 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 114 Entry vtag:114 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 115 Entry vtag:115 ptag:8 occuiped size:2 addr:400 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 116 Entry vtag:116 ptag:28 occuiped size:2 addr:e00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 117 Entry vtag:117 ptag:2 occuiped size:2 addr:100 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 118 Entry vtag:118 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 119 Entry vtag:119 ptag:16 occuiped size:2 addr:800 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 120 Entry vtag:120 ptag:10 occuiped size:2 addr:500 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 121 Entry vtag:121 ptag:22 occuiped size:2 addr:b00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 122 Entry vtag:122 ptag:12 occuiped size:2 addr:600 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 123 Entry vtag:123 ptag:18 occuiped size:2 addr:900 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 124 Entry vtag:124 ptag:24 occuiped size:2 addr:c00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 125 Entry vtag:125 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 126 Entry vtag:126 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 127 Entry vtag:127 ptag:20 occuiped size:2 addr:a00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+hand U deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand M deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand N deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand STK deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+tileRegSize: 256
+totalTileSize: 262144
+allocatorFreeSize: 262144
+allocatorLargestFreeExtent: 262144
+T used size: 0
+U used size: 0
+M used size: 0
+N used size: 0
+STK used size: 0
+hand T deallocPtr:112 retirePtr:128 lastAllocPtr:128 allocPtr:128 size 240
+ Index 112 Entry vtag:112 ptag:18 occuiped size:2 addr:900 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 113 Entry vtag:113 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 114 Entry vtag:114 ptag:12 occuiped size:2 addr:600 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 115 Entry vtag:115 ptag:30 occuiped size:2 addr:f00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 116 Entry vtag:116 ptag:2 occuiped size:2 addr:100 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 117 Entry vtag:117 ptag:10 occuiped size:2 addr:500 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 118 Entry vtag:118 ptag:4 occuiped size:2 addr:200 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 119 Entry vtag:119 ptag:24 occuiped size:2 addr:c00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 120 Entry vtag:120 ptag:20 occuiped size:2 addr:a00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 121 Entry vtag:121 ptag:26 occuiped size:2 addr:d00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 122 Entry vtag:122 ptag:0 occuiped size:2 addr:0 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 123 Entry vtag:123 ptag:14 occuiped size:2 addr:700 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 124 Entry vtag:124 ptag:16 occuiped size:2 addr:800 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 125 Entry vtag:125 ptag:22 occuiped size:2 addr:b00 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 126 Entry vtag:126 ptag:6 occuiped size:2 addr:300 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+ Index 127 Entry vtag:127 ptag:12 occuiped size:2 addr:600 regCat:0 size:256 hand:T retired:1 ready:1 kill:1
+hand U deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand M deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand N deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+hand STK deallocPtr:0 retirePtr:0 lastAllocPtr:0 allocPtr:0 size 256
+tileRegSize: 256
+totalTileSize: 262144
+allocatorFreeSize: 262144
+allocatorLargestFreeExtent: 262144
+T used size: 0
+U used size: 0
+M used size: 0
+N used size: 0
+STK used size: 0
+================ fetchThQ Dump ====================
+stid=0
+empty
+stid=1
+empty
+stid=2
+empty
+stid=3
+empty
+================ fetchThQ Dump End ================
+================ deliver gates ====================
+stid=0 be_q=4092+w7/4096 beOverflow=1 brq=244 brqStall=0 brob=5/256
+stid=1 be_q=0+w0/4096 beOverflow=0 brq=4 brqStall=0 brob=6/256
+stid=2 be_q=0+w0/4096 beOverflow=0 brq=4 brqStall=0 brob=6/256
+stid=3 be_q=0+w0/4096 beOverflow=0 brq=4 brqStall=0 brob=6/256
+F4[tid=0] state=1 slots=111832/P1,111833/P1,111834/P1,111835/P1
+F4[tid=1] state=0 slots=-1/P0,-1/P0,-1/P0,-1/P0
+F4[tid=2] state=0 slots=-1/P0,-1/P0,-1/P0,-1/P0
+F4[tid=3] state=0 slots=-1/P0,-1/P0,-1/P0,-1/P0
+global[tid=0] F0=0/-1,-1,-1,-1, F1=2/111842,111843,111844,111845, F2=2/111838,111839,111840,111841, F3=2/111836,111837,-1,-1, 
+  F2 fetchDone=1111
+  F3 decodeDone=1000
+global[tid=1] F0=0/-1,-1,-1,-1, F1=0/-1,-1,-1,-1, F2=0/-1,-1,-1,-1, F3=0/-1,-1,-1,-1, 
+  F2 fetchDone=0000
+  F3 decodeDone=0000
+global[tid=2] F0=0/-1,-1,-1,-1, F1=0/-1,-1,-1,-1, F2=0/-1,-1,-1,-1, F3=0/-1,-1,-1,-1, 
+  F2 fetchDone=0000
+  F3 decodeDone=0000
+global[tid=3] F0=0/-1,-1,-1,-1, F1=0/-1,-1,-1,-1, F2=0/-1,-1,-1,-1, F3=0/-1,-1,-1,-1, 
+  F2 fetchDone=0000
+  F3 decodeDone=0000
+bhcStallGlobal=-1,-1,-1,-1 bhcStallLocal=-1,-1,-1,-1 stageGrants=-1/rr1,0/rr1,0/rr1,0/rr1
+deliverRrTid=1 localFetchRrTid=1 lastDeliverTid=-1 localSelectVld=0 localSelectPipe=0 localSelectTid=4294967295 localSelectFbid=0 localSelectStall=0 localSelectFetched=0
+localFetchState[0] vld=0 stall=0 fetched=0 pipe=0 fbid=0 fbid_local=0
+localFetchState[1] vld=0 stall=0 fetched=0 pipe=0 fbid=0 fbid_local=0
+localFetchState[2] vld=0 stall=0 fetched=0 pipe=0 fbid=0 fbid_local=0
+localFetchState[3] vld=0 stall=0 fetched=0 pipe=0 fbid=0 fbid_local=0
+================ deliver gates End ================
+========================== DUMP BFU STATUS ==========================
+T0 F0, state: INVALID
+T0 F1, state: STALL
+	fb[0] = { stid: 0, fbid: 111842, va: 0x11b7e }
+	fb[1] = { stid: 0, fbid: 111843, va: 0x11b7e }
+	fb[2] = { stid: 0, fbid: 111844, va: 0x11b7e }
+	fb[3] = { stid: 0, fbid: 111845, va: 0x11b7e }
+T0 F2, state: STALL
+	fb[0] = { stid: 0, fbid: 111838, va: 0x11b7e }
+	fb[1] = { stid: 0, fbid: 111839, va: 0x11b7e }
+	fb[2] = { stid: 0, fbid: 111840, va: 0x11b7e }
+	fb[3] = { stid: 0, fbid: 111841, va: 0x11b7e }
+T0 F3, state: STALL
+	fb[0] = { stid: 0, fbid: 111836, va: 0x11b7e }
+	fb[1] = { stid: 0, fbid: 111837, va: 0x11b7e }
+	fb[2] = nullptr
+	fb[3] = nullptr
+T1 F0, state: INVALID
+T1 F1, state: INVALID
+T1 F2, state: INVALID
+T1 F3, state: INVALID
+T2 F0, state: INVALID
+T2 F1, state: INVALID
+T2 F2, state: INVALID
+T2 F3, state: INVALID
+T3 F0, state: INVALID
+T3 F1, state: INVALID
+T3 F2, state: INVALID
+T3 F3, state: INVALID
+========================== DUMP BFU END =============================
+================ local BFU lanes ==================
+local[0] ready=0 F0=empty F2=empty F3=empty
+local[1] ready=0 F0=empty F2=empty F3=empty
+local[2] ready=0 F0=empty F2=empty F3=empty
+local[3] ready=0 F0=empty F2=empty F3=empty
+local[4] ready=0 F0=empty F2=empty F3=empty
+local[5] ready=0 F0=empty F2=empty F3=empty
+local[6] ready=0 F0=empty F2=empty F3=empty
+local[7] ready=0 F0=empty F2=empty F3=empty
+local[8] ready=0 F0=empty F2=empty F3=empty
+local[9] ready=0 F0=empty F2=empty F3=empty
+local[10] ready=0 F0=empty F2=empty F3=empty
+local[11] ready=0 F0=empty F2=empty F3=empty
+local[12] ready=0 F0=empty F2=empty F3=empty
+local[13] ready=0 F0=empty F2=empty F3=empty
+local[14] ready=0 F0=empty F2=empty F3=empty
+local[15] ready=0 F0=empty F2=empty F3=empty
+local[16] ready=0 F0=empty F2=empty F3=empty
+local[17] ready=0 F0=empty F2=empty F3=empty
+local[18] ready=0 F0=empty F2=empty F3=empty
+local[19] ready=0 F0=empty F2=empty F3=empty
+local[20] ready=0 F0=empty F2=empty F3=empty
+local[21] ready=0 F0=empty F2=empty F3=empty
+local[22] ready=0 F0=empty F2=empty F3=empty
+local[23] ready=0 F0=empty F2=empty F3=empty
+local[24] ready=0 F0=empty F2=empty F3=empty
+local[25] ready=0 F0=empty F2=empty F3=empty
+local[26] ready=0 F0=empty F2=empty F3=empty
+local[27] ready=0 F0=empty F2=empty F3=empty
+local[28] ready=0 F0=empty F2=empty F3=empty
+local[29] ready=0 F0=empty F2=empty F3=empty
+local[30] ready=0 F0=empty F2=empty F3=empty
+local[31] ready=0 F0=empty F2=empty F3=empty
+================ local BFU lanes End ==============
+============== DUMP cmdIqPark ==============
+stid=0 size=0 (empty)
+stid=1 size=0 (empty)
+stid=2 size=0 (empty)
+stid=3 size=0 (empty)
+cmdIqParkRr=0
+BIQ type=1 occ=0/8
+BIQ type=1 occ=0/8
+BIQ type=1 occ=0/8
+BIQ type=1 occ=0/8
+BIQ type=0 occ=0/32
+BIQ type=0 occ=0/32
+BIQ type=0 occ=0/32
+BIQ type=0 occ=0/32
+BIQ type=5 occ=0/64
+BIQ type=7 occ=0/8
+============== DUMP cmdIqPark END ==============
+============== DUMP TLSU FRONTEND peId=0 cycle=297100 ==============
+LIQ 2/64  LHQ 3/128  STQ 1/256  SCB 0/64  liqFullCycles=0 stqFullCycles=0
+windows: stid0{ld=10354,st=13497,ldSlides=10338,stSlides=13433,blockedLoadId=0,blockedCnt=0} stid1{ld=10801,st=10655,ldSlides=10785,stSlides=10591,blockedLoadId=6434,blockedCnt=76} stid2{ld=11317,st=10655,ldSlides=11301,stSlides=10591,blockedLoadId=0,blockedCnt=0} stid3{ld=11320,st=10655,ldSlides=11304,stSlides=10591,blockedLoadId=0,blockedCnt=0}
+per-stid: stid0{liq=2/16,stq=1/64,ldNum=10322,stNum=13431} stid1{liq=0/16,stq=0/64,ldNum=10749,stNum=10590} stid2{liq=0/16,stq=0/64,ldNum=11250,stNum=10590} stid3{liq=0/16,stq=0/64,ldNum=11258,stNum=10590}
+  LIQ[0] issued sleep=none kind=scalar_load stid=0 bid=20 rid=77 addr=0x29d20 size=4 tileRdy=1 priv=1 alloc=297095 issue=297099 age=5
+  LIQ[1] asleep sleep=unknown kind=scalar_load stid=0 bid=22 rid=87 addr=0x0 size=0 tileRdy=1 priv=0 alloc=297099 issue=0 age=1
+  STQ[0] stid=0 bid=20/0 rid=79/1 sid=13430 addr=0x29d20 size=4 addrRdy=1 dataRdy=0 ivRes=1 scalar=1 priv=1 pastNF=1 pastNFrid=1 ready=0 hasOlder=0 alloc=297098
+============== DUMP TLSU FRONTEND END ==============
+[C:297099 ][DFX.NA    ]: 
+---------------------------------------------------------------------
+ERROR:Deadlock execution at:
+ thread: 0B19 STID0 BPC 0x11b8a [STD COND] STD completed
+ thread: 1B44 STID1 BPC 0x112b0 [STD FALL] STD terminate
+ thread: 2B33 STID2 BPC 0x112b0 [STD FALL] STD terminate
+ thread: 3B41 STID3 BPC 0x112b0 [STD FALL] STD terminate
+    Cycle:297100
+    Error BlockID:44
+    Wait cycles:9999
+    Reference queue depth:0
+    Ref BPC: unavailable (reference queue empty)
+    Model BPC: 0x112b0 isPar: 0 completed: false
+    Model Execute Minst:
+            TPC 0x112b0, opcode: BSTART, data: 0x0
+    Reference Execute Minst:
+            Reference block info unavailable
+    Please check function model log at line: B11564 M0
+    0 instructions correctly executed so far
+---------------------------------------------------------------------
+
+[gfsim] caught std::exception: ASSERTION FAILED: false && "Deadlock detected: simulation stalled, no new blocks committed for too long"
+, func ResVerify, file /tmp/opencode/ssm-main/TimingSim/infra/SimSys.cpp:1287
+stack:
+./bin/gfsim(+0x47f2ec) [0xaaaac218f2ec]
+./bin/gfsim(+0x340d8) [0xaaaac1d440d8]
+/lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe8) [0xffff9925ae10]
+./bin/gfsim(+0x109b78) [0xaaaac1e19b78]
+
+std::terminate called (unhandled exception or exception during unwinding)
+
+FATAL: gfsim received signal 6
+./bin/gfsim(+0x10aa44)[0xaaaac1e1aa44]
+linux-vdso.so.1(__kernel_rt_sigreturn+0x0)[0xffff9970d8dc]
+/lib/aarch64-linux-gnu/libc.so.6(gsignal+0xe0)[0xffff9926dd88]
+/lib/aarch64-linux-gnu/libc.so.6(abort+0x114)[0xffff9925aaac]
+./bin/gfsim(+0x10aa08)[0xaaaac1e1aa08]
+/lib/aarch64-linux-gnu/libstdc++.so.6(+0x9f20c)[0xffff9951d20c]
+/lib/aarch64-linux-gnu/libstdc++.so.6(+0x9f270)[0xffff9951d270]
+/lib/aarch64-linux-gnu/libstdc++.so.6(__cxa_rethrow+0x60)[0xffff9951d5d0]
+./bin/gfsim(+0x34fd4)[0xaaaac1d44fd4]
+/lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe8)[0xffff9925ae10]
+./bin/gfsim(+0x109b78)[0xaaaac1e19b78]
+timeout: the monitored command dumped core

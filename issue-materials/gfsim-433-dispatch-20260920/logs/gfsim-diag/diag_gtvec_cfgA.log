@@ -1,0 +1,152 @@
+./bin/gfsim -f /tmp/opencode/pr163/benchmark/one-level-arch/output/solution/group_token_vec/elf/solution_group_token_vec_group_token_vec_mt_dyn.elf --conf fourpe 
+[gfsim] explicit PE config present; skipping ELF auto-detection
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Override configurations:
+core.threadCount=4
+core.stdPeCount=1
+core.cube_core_num=4
+core.cube_thread_num=1
+core.vec_core_num=4
+fourpe.pe_cluster_enable=true
+fourpe.pe_cluster_count=4
+fourpe.pe_cluster_frontend_thread_count=4
+fourpe.pe_cluster_aggregate_decode_width=8
+fourpe.pe_cluster_gpr_rename_partition_entries=128
+fourpe.pe_cluster_scalar_rob_partition_entries=128
+fourpe.pe_cluster_scalar_iq_partition_entries=128
+fourpe.pe_cluster_block_rob_partition_entries=256
+fourpe.pe_cluster_block_iq_partition_entries=88
+fourpe.pe_cluster_local_reg_partition_entries=88
+bfu.brq_depth=1024
+fourpe.pe_cluster_partition_borrow_enable=false
+fourpe.pe_cluster_eligible_rr_fairness_check=true
+fourpe.pe_cluster_group_contract_fatal=false
+dfx.swimCounterSampleInterval=8
+Memory: 0x10200 - 0x10248 (Size=0KB) [.rodata]
+Memory: 0x1024c - 0x1025f (Size=0KB) [.eh_frame_hdr]
+Memory: 0x10260 - 0x102ab (Size=0KB) [.eh_frame]
+Memory: 0x112ac - 0x12113 (Size=3KB) [.text]
+Memory: 0x13118 - 0x1312f (Size=0KB) [.init_array]
+Memory: 0x13130 - 0x13147 (Size=0KB) [.data.rel.ro]
+Memory: 0x14148 - 0x34f23 (Size=131KB) [.bss]
+Memory: 0x34f28 - 0x34f3f (Size=0KB) [.sbss]
+Memory: 0x34f40 - 0x8044f40 (Size=131136KB) [stack mem]
+Memory: 0x4000802000 - 0x4008803000 (Size=131076KB) [map mem]
+tid: 0 Core@100000: Retired blocks 1768. BROB head info: B186 STID0 BPC 0x113a0 [STD COND]
+tid: 1 Core@100000: Retired blocks 1768. BROB head info: B186 STID1 BPC 0x113a0 [STD COND]
+tid: 2 Core@100000: Retired blocks 1768. BROB head info: B186 STID2 BPC 0x113a0 [STD COND]
+tid: 3 Core@100000: Retired blocks 1768. BROB head info: B186 STID3 BPC 0x113a0 [STD COND]
+[C:113037 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704641 pending=0
+[C:113468 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704642 pending=0
+[C:113699 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704643 pending=0
+[C:116612 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704645 pending=0
+[C:160093 ][TMA.NA    ]: nuke_pair_diag ld_stid=0 ld_bid=14/w1 ld_rid=37 st_stid=0 st_bid=13/w1 st_rid=33
+[C:185582 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=212 younger_rid=212 older_bid=205 older_rid=205 younger_slot=3 older_slot=1
+[C:185630 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=219 younger_rid=219 older_bid=212 older_rid=212 younger_slot=2 older_slot=3
+[C:185676 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=226 younger_rid=226 older_bid=219 older_rid=219 younger_slot=1 older_slot=2
+[C:185756 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=233 younger_rid=233 older_bid=226 older_rid=226 younger_slot=2 older_slot=1
+[C:185820 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=240 younger_rid=240 older_bid=233 older_rid=233 younger_slot=4 older_slot=2
+[C:185868 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=247 younger_rid=247 older_bid=240 older_rid=240 younger_slot=2 older_slot=4
+[C:185914 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=254 younger_rid=254 older_bid=247 older_rid=247 younger_slot=3 older_slot=2
+[C:185946 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=5 younger_rid=5 older_bid=254 older_rid=254 younger_slot=0 older_slot=3
+[C:186020 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=12 younger_rid=12 older_bid=5 older_rid=5 younger_slot=2 older_slot=0
+[C:186088 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=19 younger_rid=19 older_bid=12 older_rid=12 younger_slot=4 older_slot=2
+[C:186168 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=26 younger_rid=26 older_bid=19 older_rid=19 younger_slot=2 older_slot=4
+[C:186200 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=33 younger_rid=33 older_bid=26 older_rid=26 younger_slot=8 older_slot=2
+[C:186246 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=40 younger_rid=40 older_bid=33 older_rid=33 younger_slot=3 older_slot=8
+[C:186310 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=47 younger_rid=47 older_bid=40 older_rid=40 younger_slot=5 older_slot=3
+[C:186342 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=54 younger_rid=54 older_bid=47 older_rid=47 younger_slot=7 older_slot=5
+[C:186398 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=61 younger_rid=61 older_bid=54 older_rid=54 younger_slot=6 older_slot=7
+[C:186466 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=68 younger_rid=68 older_bid=61 older_rid=61 younger_slot=4 older_slot=6
+[C:186530 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=75 younger_rid=75 older_bid=68 older_rid=68 younger_slot=9 older_slot=4
+[C:186578 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=82 younger_rid=82 older_bid=75 older_rid=75 younger_slot=7 older_slot=9
+[C:186658 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=89 younger_rid=89 older_bid=82 older_rid=82 younger_slot=10 older_slot=7
+[C:186704 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=96 younger_rid=96 older_bid=89 older_rid=89 younger_slot=3 older_slot=10
+[C:186768 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=103 younger_rid=103 older_bid=96 older_rid=96 younger_slot=0 older_slot=3
+[C:186800 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=110 younger_rid=110 older_bid=103 older_rid=103 younger_slot=12 older_slot=0
+[C:186864 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=117 younger_rid=117 older_bid=110 older_rid=110 younger_slot=14 older_slot=12
+[C:186910 ][TMA.NA    ]: scb_waw_violation peId=0 scalar=0 private=0 younger_bid=124 younger_rid=124 older_bid=117 older_rid=117 younger_slot=10 older_slot=14
+tid: 0 Core@200000: Retired blocks 37278. BROB head info: B222 STID0 BPC 0x1187a [STD COND]
+tid: 1 Core@200000: Retired blocks 37278. BROB head info: B150 STID1 BPC 0x11926 [STD COND]
+tid: 2 Core@200000: Retired blocks 37278. BROB head info: B148 STID2 BPC 0x11926 [STD COND]
+tid: 3 Core@200000: Retired blocks 37278. BROB head info: B150 STID3 BPC 0x11926 [STD COND]
+[C:213765 ][TMA.NA    ]: nuke_pair_diag ld_stid=0 ld_bid=165/w0 ld_rid=54 st_stid=0 st_bid=164/w0 st_rid=50
+[C:213980 ][TMA.NA    ]: l1d_refill_unmatched peId=0 requestId=17293822569102704761 pending=0
+tid: 0 Core@300000: Retired blocks 110452. BROB head info: B160 STID0 BPC 0x11b92 [STD DIRECT]
+tid: 1 Core@300000: Retired blocks 110452. BROB head info: B156 STID1 BPC 0x11ab4 [STD COND]
+tid: 2 Core@300000: Retired blocks 110452. BROB head info: B156 STID2 BPC 0x11ab4 [STD COND]
+tid: 3 Core@300000: Retired blocks 110452. BROB head info: B156 STID3 BPC 0x11ab4 [STD COND]
+tid: 0 Core@400000: Retired blocks 179990. BROB head info: B43 STID0 BPC 0x11c2c [STD COND]
+tid: 1 Core@400000: Retired blocks 179990. BROB head info: B149 STID1 BPC 0x11ab4 [STD COND]
+tid: 2 Core@400000: Retired blocks 179990. BROB head info: B149 STID2 BPC 0x11ab4 [STD COND]
+tid: 3 Core@400000: Retired blocks 179990. BROB head info: B193 STID3 BPC 0x11ab4 [STD COND]
+tid: 0 Core@500000: Retired blocks 244908. BROB head info: B66 STID0 BPC 0x11c2c [STD COND]
+tid: 1 Core@500000: Retired blocks 244908. BROB head info: B199 STID1 BPC 0x11ab4 [STD COND]
+tid: 2 Core@500000: Retired blocks 244908. BROB head info: B195 STID2 BPC 0x11ab4 [STD COND]
+tid: 3 Core@500000: Retired blocks 244908. BROB head info: B224 STID3 BPC 0x11ab4 [STD COND]
+tid: 0 Core@600000: Retired blocks 308661. BROB head info: B23 STID0 BPC 0x11c7e [STD COND]
+tid: 1 Core@600000: Retired blocks 308661. BROB head info: B206 STID1 BPC 0x11ab4 [STD COND]
+tid: 2 Core@600000: Retired blocks 308661. BROB head info: B207 STID2 BPC 0x11ab4 [STD COND]
+tid: 3 Core@600000: Retired blocks 308661. BROB head info: B1 STID3 BPC 0x11ab4 [STD COND]
