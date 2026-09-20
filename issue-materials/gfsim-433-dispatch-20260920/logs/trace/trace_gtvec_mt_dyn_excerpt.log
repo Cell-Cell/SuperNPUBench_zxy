@@ -1,0 +1,47 @@
+# group_token_vec_mt_dyn --conf fourpe -t 1 trace 摘录（全量约 2.5GB 未打包；复现：bin/gfsim -f <gtvec_dyn.elf> --conf fourpe -t 1，跑 ~480s 覆盖 C:0-320K）
+# 符号：sPhaseDone=0x14438（T0/T1/T2/T3 槽 = 0x14438/3c/40/44）；栈：T0 sp=0x8045130, T1=0x10055130, T2=0x18065130, T3=0x20075130
+
+########## 窗口 A：四线程 driver 入口 tid 溢出（C:95-115）##########
+[C:95     ][SPE.STAGE ]: BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST0  TR10-UR2 sid:22 lsid:12 src0:a1-P(27)-rdy,src1:sp-P(25)-rdy,src2:40,|sdi a1, sp, 40 last: false completed
+[C:96     ][SPE.STAGE ]: BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST1  TR10-UR2 sid:22 lsid:12 src0:a1-P(155)-rdy,src1:sp-P(153)-rdy,src2:40,|sdi a1, sp, 40 last: false completed
+[C:97     ][SPE.STAGE ]: BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST2  TR10-UR2 sid:22 lsid:12 src0:a1-P(283)-rdy,src1:sp-P(281)-rdy,src2:40,|sdi a1, sp, 40 last: false completed
+[C:98     ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x11348 B3:G0:R46:STID0:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x8045158 TYPE addr DATA 0x0
+[C:98     ][LSU.NA    ]: [CLT1]: store TPC 0x11348 B3:G0:R46:STID0:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x8045158 TYPE addr DATA 0x0 is written to SCB1. tag 0x8045140, addr 0x8045158, size 0x8, data 0x0. Req: TPC 0x11348 B3:G0:R46:STID0:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x8045158 TYPE addr DATA 0x0
+[C:98     ][SPE.STAGE ]: BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST3  TR10-UR2 sid:22 lsid:12 src0:a1-P(411)-rdy,src1:sp-P(394)-rdy,src2:40,|sdi a1, sp, 40 last: false completed
+[C:99     ][SPE.STAGE ]:  retire entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST0  TR10-UR2 sid:22 lsid:12 src0:a1-P(27)-rdy data=0x0,src1:sp-P(25)-rdy data=0x8045130,src2:40,|sdi a1, sp, 40 last: false size 14 osd size 11
+[C:99     ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x11348 B3:G0:R46:STID1:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x10055158 TYPE addr DATA 0x1
+[C:99     ][LSU.NA    ]: [CLT1]: store TPC 0x11348 B3:G0:R46:STID1:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x10055158 TYPE addr DATA 0x1 is written to SCB1. tag 0x10055140, addr 0x10055158, size 0x8, data 0x1. Req: TPC 0x11348 B3:G0:R46:STID1:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x10055158 TYPE addr DATA 0x1
+[C:100    ][SPE.STAGE ]:  ROB: check retire dealloc entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST0  TR10-UR2 sid:22 lsid:12 src0:a1-P(27)-rdy data=0x0,src1:sp-P(25)-rdy data=0x8045130,src2:40,|sdi a1, sp, 40 last: false rob size 15 osd size 12
+[C:100    ][SPE.STAGE ]:  retire entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST1  TR10-UR2 sid:22 lsid:12 src0:a1-P(155)-rdy data=0x1,src1:sp-P(153)-rdy data=0x10055130,src2:40,|sdi a1, sp, 40 last: false size 14 osd size 11
+[C:100    ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x11348 B3:G0:R46:STID2:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x18065158 TYPE addr DATA 0x2
+[C:101    ][SPE.STAGE ]:  ROB: check retire dealloc entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST1  TR10-UR2 sid:22 lsid:12 src0:a1-P(155)-rdy data=0x1,src1:sp-P(153)-rdy data=0x10055130,src2:40,|sdi a1, sp, 40 last: false rob size 15 osd size 12
+[C:101    ][SPE.STAGE ]:  retire entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST2  TR10-UR2 sid:22 lsid:12 src0:a1-P(283)-rdy data=0x2,src1:sp-P(281)-rdy data=0x18065130,src2:40,|sdi a1, sp, 40 last: false size 14 osd size 11
+[C:101    ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x11348 B3:G0:R46:STID3:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x20075158 TYPE addr DATA 0x3
+[C:102    ][SPE.STAGE ]:  ROB: check retire dealloc entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST2  TR10-UR2 sid:22 lsid:12 src0:a1-P(283)-rdy data=0x2,src1:sp-P(281)-rdy data=0x18065130,src2:40,|sdi a1, sp, 40 last: false rob size 15 osd size 12
+[C:102    ][SPE.STAGE ]:  retire entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST3  TR10-UR2 sid:22 lsid:12 src0:a1-P(411)-rdy data=0x3,src1:sp-P(394)-rdy data=0x20075130,src2:40,|sdi a1, sp, 40 last: false size 14 osd size 11
+[C:103    ][SPE.STAGE ]:  ROB: check retire dealloc entry 46 BPC:0x112e8 TPC:0x11348 P0-L0-(B3-)-G0-T0-I46-ST3  TR10-UR2 sid:22 lsid:12 src0:a1-P(411)-rdy data=0x3,src1:sp-P(394)-rdy data=0x20075130,src2:40,|sdi a1, sp, 40 last: false rob size 15 osd size 12
+
+########## 窗口 B：T2 溢出写生命周期（C:100-200）##########
+[C:100    ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x11348 B3:G0:R46:STID2:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x18065158 TYPE addr DATA 0x2
+[C:102    ][DFX.NA    ]: record model minst bid 3 tpc:0x11348 data:0x18065158
+[C:193    ][LSU.NA    ]: [CLT1]: store TPC 0x11348 B3:G0:R46:STID2:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x18065158 TYPE addr DATA 0x2 is written to SCB1. tag 0x18065140, addr 0x18065158, size 0x8, data 0x2. Req: TPC 0x11348 B3:G0:R46:STID2:SUB0 LSID:12 peID:0 sdi size:8 fromScalper: 0 INST_UID:0 SID:22 ADDR 0x18065158 TYPE addr DATA 0x2
+[C:193    ][LSU.NA    ]: [SCB1]: insert entry. blk_addr 0x18065140, addr 0x18065158, size 8, data 0x2.Combine, full 0
+[C:174119 ][MIEX.E1   ]:  [IEX E1]: Send req to lsu: TPC 0x1174a B248:G0:R126:STID2:SUB0 LSID:0 peID:0 ldi size:8 fromScalper: 0 INST_UID:0 ADDR 0x18065158  cycels 174120
+[C:174121 ][LSU.NA    ]: L1 [CLT1]: lookup L1 D-Cache, 0x0000000000000000_0x0000000000000000_0x0000000000000000_0x0000000000000000_0x0000000000000000_0x0000000000000000_0x0000000000000000_0x0000000000000000, TPC 0x1174a B248:G0:R126:STID2:SUB0 LSID:0 peID:0 ldi size:8 fromScalper: 0 INST_UID:0 ADDR 0x18065158 TYPE all DATA 0x0
+
+########## 窗口 C：barrier(1) flag 写入（C:174100-174900，含 T2 错槽与 T3 正确写）##########
+[C:174133 ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x1174e B248:G0:R127:STID2:SUB0 LSID:1 peID:0 sw size:4 fromScalper: 0 INST_UID:0 SID:10289 ADDR 0x14438 TYPE addr DATA 0x1
+[C:174846 ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x1174e B23:G0:R107:STID3:SUB0 LSID:1 peID:0 sw size:4 fromScalper: 0 INST_UID:0 SID:10320 ADDR 0x14444 TYPE addr DATA 0x1
+[C:174848 ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x1174e B23:G0:R107:STID2:SUB0 LSID:1 peID:0 sw size:4 fromScalper: 0 INST_UID:0 SID:10320 ADDR 0x14438 TYPE addr DATA 0x1
+[C:174850 ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x1174e B23:G0:R107:STID0:SUB0 LSID:1 peID:0 sw size:4 fromScalper: 0 INST_UID:0 SID:10320 ADDR 0x14438 TYPE addr DATA 0x1
+[C:174855 ][SPE.NA    ]: [VecPE0]: store resolve. TPC 0x1174e B23:G0:R107:STID1:SUB0 LSID:1 peID:0 sw size:4 fromScalper: 0 INST_UID:0 SID:10320 ADDR 0x1443c TYPE addr DATA 0x1
+
+########## 窗口 D：T2 的 ldi [sp,40] 两次均读 0（C:174113-174841）##########
+[C:174125 ][SPE.STAGE ]: BPC:0x1173e TPC:0x1174a P0-L0-(B248-)-G0-T0-I126-ST2  TR92-UR8 sid:0 lsid:0 src0:sp-P(281)-rdy data=0x18065130,src1:40,->dst0:a0-P(290) data=0x0,|ldi sp, 40 -> a0 last: false completed
+[C:174845 ][SPE.STAGE ]: BPC:0x1173e TPC:0x1174a P0-L0-(B23+)-G0-T0-I106-ST2  TR111-UR6 sid:0 lsid:0 src0:sp-P(281)-rdy data=0x18065130,src1:40,->dst0:a0-P(267) data=0x0,|ldi sp, 40 -> a0 last: false completed
+[C:174846 ][SPE.STAGE ]:  retire entry 106 BPC:0x1173e TPC:0x1174a P0-L0-(B23+)-G0-T0-I106-ST2  TR111-UR6 sid:0 lsid:0 src0:sp-P(281)-rdy data=0x18065130,src1:40,->dst0:a0-P(267) data=0x0,|ldi sp, 40 -> a0 last: false size 16 osd size 16
+[C:174847 ][SPE.STAGE ]:  ROB: check retire dealloc entry 106 BPC:0x1173e TPC:0x1174a P0-L0-(B23+)-G0-T0-I106-ST2  TR111-UR6 sid:0 lsid:0 src0:sp-P(281)-rdy data=0x18065130,src1:40,->dst0:a0-P(267) data=0x0,|ldi sp, 40 -> a0 last: false rob size 16 osd size 15
+
+########## 窗口 E：自旋读 0x14440（.LBB1_70 lwi@0x11770）与值 ##########
+ 213839 ADDR 0x14440
+1282624

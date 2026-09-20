@@ -1,0 +1,138 @@
+# mega_moe_sim_mt_dyn --conf fourpe -t 1 全量 trace 摘录（完整 run 至死锁 C:223712；原始 2.2GB 未打包，可按需重跑：bin/gfsim -f <mega_dyn.elf> --conf fourpe -t 1）
+# 关键窗口：C:213540-213700（四线程相继发散至 0x116ce）+ 死锁 dump
+
+########## 发散前驱（STID2 块分配序列，C:213540-213660）##########
+[C:213550 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x115f4 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x115f4 last: false to B27 STID3 BPC 0x115f4 [STD COND]
+[C:213561 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x115f4 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x115f4 last: false to B28 STID2 BPC 0x115f4 [STD COND]
+[C:213564 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x115f4 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x115f4 last: false to B28 STID1 BPC 0x115f4 [STD COND]
+[C:213571 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x115f4 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x115f4 last: false to B28 STID0 BPC 0x115f4 [STD COND]
+[C:213577 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11656 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B28 STID2 BPC 0x11656 [STD CALL]
+[C:213580 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11656 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B28 STID1 BPC 0x11656 [STD CALL]
+[C:213582 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x115f4 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x115f4 last: false to B28 STID3 BPC 0x115f4 [STD COND]
+[C:213587 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11656 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B28 STID0 BPC 0x11656 [STD CALL]
+[C:213589 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B29 STID2 BPC 0x12f38 [STD COND]
+[C:213592 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B29 STID1 BPC 0x12f38 [STD COND]
+[C:213593 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B30 STID2 BPC 0x12f40 [STD FALL]
+[C:213596 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B30 STID1 BPC 0x12f40 [STD FALL]
+[C:213597 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B31 STID2 BPC 0x12f44 [STD FALL MSET]
+[C:213597 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B32 STID2 BPC 0x12f48 [STD RET]
+[C:213598 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11656 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B28 STID3 BPC 0x11656 [STD CALL]
+[C:213599 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B29 STID0 BPC 0x12f38 [STD COND]
+[C:213600 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B31 STID1 BPC 0x12f44 [STD FALL MSET]
+[C:213600 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B32 STID1 BPC 0x12f48 [STD RET]
+[C:213601 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1167c P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B33 STID2 BPC 0x1167c [STD CALL]
+[C:213603 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B30 STID0 BPC 0x12f40 [STD FALL]
+[C:213604 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1167c P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B33 STID1 BPC 0x1167c [STD CALL]
+[C:213607 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B31 STID0 BPC 0x12f44 [STD FALL MSET]
+[C:213607 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B32 STID0 BPC 0x12f48 [STD RET]
+[C:213609 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B34 STID2 BPC 0x12f38 [STD COND]
+[C:213610 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B29 STID3 BPC 0x12f38 [STD COND]
+[C:213611 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1167c P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B33 STID0 BPC 0x1167c [STD CALL]
+[C:213612 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B34 STID1 BPC 0x12f38 [STD COND]
+[C:213613 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B35 STID2 BPC 0x12f40 [STD FALL]
+[C:213613 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B36 STID2 BPC 0x12f44 [STD FALL MSET]
+[C:213614 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B30 STID3 BPC 0x12f40 [STD FALL]
+[C:213616 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B35 STID1 BPC 0x12f40 [STD FALL]
+[C:213616 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B36 STID1 BPC 0x12f44 [STD FALL MSET]
+[C:213617 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B37 STID2 BPC 0x12f48 [STD RET]
+[C:213618 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B31 STID3 BPC 0x12f44 [STD FALL MSET]
+[C:213618 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B32 STID3 BPC 0x12f48 [STD RET]
+[C:213619 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B34 STID0 BPC 0x12f38 [STD COND]
+[C:213620 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B37 STID1 BPC 0x12f48 [STD RET]
+[C:213621 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1168e P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|B.HINT TRACE.begin last: false to B38 STID2 BPC 0x1168e [STD FALL]
+[C:213621 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11692 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B39 STID2 BPC 0x11692 [STD COND]
+[C:213622 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1167c P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false to B33 STID3 BPC 0x1167c [STD CALL]
+[C:213623 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B35 STID0 BPC 0x12f40 [STD FALL]
+[C:213623 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B36 STID0 BPC 0x12f44 [STD FALL MSET]
+[C:213624 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1168e P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|B.HINT TRACE.begin last: false to B38 STID1 BPC 0x1168e [STD FALL]
+[C:213624 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11692 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B39 STID1 BPC 0x11692 [STD COND]
+[C:213627 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B37 STID0 BPC 0x12f48 [STD RET]
+[C:213629 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116a6 P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B40 STID2 BPC 0x116a6 [STD COND]
+[C:213630 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f38 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12f4c last: false to B34 STID3 BPC 0x12f38 [STD COND]
+[C:213631 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1168e P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|B.HINT TRACE.begin last: false to B38 STID0 BPC 0x1168e [STD FALL]
+[C:213631 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11692 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B39 STID0 BPC 0x11692 [STD COND]
+[C:213632 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116a6 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B40 STID1 BPC 0x116a6 [STD COND]
+[C:213634 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f40 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD last: false to B35 STID3 BPC 0x12f40 [STD FALL]
+[C:213634 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f44 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|MSET [a3, a1, a2] last: false to B36 STID3 BPC 0x12f44 [STD FALL MSET]
+[C:213638 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x12f48 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false to B37 STID3 BPC 0x12f48 [STD RET]
+[C:213639 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116a6 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B40 STID0 BPC 0x116a6 [STD COND]
+[C:213642 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x1168e P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|B.HINT TRACE.begin last: false to B38 STID3 BPC 0x1168e [STD FALL]
+[C:213642 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x11692 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B39 STID3 BPC 0x11692 [STD COND]
+[C:213645 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B41 STID2 BPC 0x116ce [STD DIRECT]
+[C:213648 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B41 STID1 BPC 0x116ce [STD DIRECT]
+[C:213649 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B42 STID2 BPC 0x116ce [STD DIRECT]
+[C:213650 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116a6 P0-L0-(B0-)-G0-T0-I0-ST3  TR0-UR0 sid:0 lsid:0|C.BSTART.STD COND, 0x12658 last: false to B40 STID3 BPC 0x116a6 [STD COND]
+[C:213652 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B42 STID1 BPC 0x116ce [STD DIRECT]
+[C:213655 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B41 STID0 BPC 0x116ce [STD DIRECT]
+[C:213657 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST2  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B43 STID2 BPC 0x116ce [STD DIRECT]
+[C:213659 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B42 STID0 BPC 0x116ce [STD DIRECT]
+[C:213660 ][BCC.F5    ]: Alloc BROB Entry from:BPC:0x0 TPC:0x116ce P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0|C.BSTART.STD DIRECT, 0x116ce last: false to B43 STID1 BPC 0x116ce [STD DIRECT]
+
+########## 首个 0x116ce 块（C:213645, STID2）上下文 ##########
+[C:213643 ][BFU.NA    ]: BHC Check Stall:, stid=0, stall_fb=false, missq overflow=false
+[C:213643 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116b0 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 16 -> a0 last: false
+[C:213643 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116b0 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 16 -> a0 last: false
+[C:213643 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116b4 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 24 -> a2 last: false
+[C:213643 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116b4 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 24 -> a2 last: false
+[C:213643 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116b8 P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 32 -> a5 last: false
+[C:213643 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116b8 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |lwui fp(s0), 32 -> a5 last: false
+[C:213643 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116bc P0-L0-(B0-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |c.sext.w a1 -> t last: false
+[C:213643 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116bc P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:0 |c.sext.w a1 -> t last: false
+[C:213643 ][BCC.D1    ]:  BPC:0x116a6 TPC:0x116b0 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:2 src0:fp(s0)(!renamed),src1:16,->dst0:a0(!renamed),|lwui fp(s0), 16 -> a0 last: false| BPC:0x116a6 TPC:0x116b4 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:3 src0:fp(s0)(!renamed),src1:24,->dst0:a2(!renamed),|lwui fp(s0), 24 -> a2 last: false| BPC:0x116a6 TPC:0x116b8 P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:4 src0:fp(s0)(!renamed),src1:32,->dst0:a5(!renamed),|lwui fp(s0), 32 -> a5 last: false| BPC:0x116a6 TPC:0x116bc P0-L0-(B40-)-G0-T0-I0-ST0  TR0-UR0 sid:0 lsid:5 src0:a1(!renamed),->dst0:t(!renamed),|c.sext.w a1 -> t last: false|
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x12f44 TPC:0x1c P0-L0-(B31-)-G0-T0-I95-ST0  TR0-UR0 sid:6728 lsid:2 src0:zero,src1:t#1(!renamed),src2:0x40,|sdi.u zero, t#1, 0x40 last: false, occ:5
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x12f44 TPC:0x20 P0-L0-(B31-)-G0-T0-I96-ST0  TR0-UR0 sid:6729 lsid:3 |BSTOP last: true, occ:6
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x12f48 TPC:0x12f48 P0-L0-(B32-)-G0-T0-I97-ST0  TR0-UR0 sid:0 lsid:0|C.BSTART.STD RET last: false, occ:7
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x12f48 TPC:0x12f4a P0-L0-(B32-)-G0-T0-I98-ST0  TR0-UR0 sid:0 lsid:0 src0:ra(!renamed),|c.setc.tgt ra last: false, occ:8
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x12f48 TPC:0x12f4c P0-L0-(B32-)-G0-T0-I99-ST0  TR0-UR0 sid:0 lsid:0 |BSTOP last: true, occ:9
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x1167c TPC:0x1167c P0-L0-(B33-)-G0-T0-I100-ST0  TR0-UR0 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false, occ:10
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x1167c TPC:0x11680 P0-L0-(B33-)-G0-T0-I101-ST0  TR0-UR0 sid:0 lsid:0 src0:0xe,->dst0:ra(!renamed),|c.setret 0xe -> ra last: false, occ:11
+[C:213643 ][BCC.D1    ]: alloc pe rob, BPC:0x1167c TPC:0x11682 P0-L0-(B33-)-G0-T0-I102-ST0  TR0-UR0 sid:0 lsid:0 src0:57344,->dst0:t(!renamed),|addtpc 57344 -> t last: false, occ:12
+[C:213643 ][SPE.STAGE ]:  retire entry 93 BPC:0x12f44 TPC:0x14 P0-L0-(B31-)-G0-T1-I93-ST1  TR13-UR4 sid:6727 lsid:1 src0:t#1-P(12)-rdy data=0x1e000,src1:0x40,->dst0:t-P(13) data=0x1e040,|addi t#1, 0x40 -> t last: false size 23 osd size 22
+[C:213643 ][SPE.STAGE ]:  ROB: check retire dealloc entry 92 BPC:0x12f44 TPC:0x10 P0-L0-(B31-)-G0-T1-I92-ST1  TR13-UR4 sid:6726 lsid:0 src0:t#1-P(12)-rdy data=0x1e000,|dc.zva t#1 last: false rob size 23 osd size 22
+[C:213643 ][DFX.NA    ]: record model minst bid 31 tpc:0x10 data:0x0
+[C:213643 ][SPE.STAGE ]:  retire entry 114 BPC:0x12f44 TPC:0x12f44 P0-L0-(B36-)-G0-T0-I114-ST2  TR16-UR4 sid:0 lsid:0|MSET [a3, a1, a2] last: false size 4 osd size 4
+[C:213643 ][SPE.STAGE ]:  ROB: check retire dealloc entry 82 BPC:0x12f38 TPC:0x12f3e P0-L0-(B29-)-G0-T0-I82-ST3  TR11-UR2 sid:0 lsid:0 src0:t#1-P(10)-rdy data=0x0,src1:zero data=0x0,|c.setc.ne t#1, zero last: false rob size 6 osd size 0
+[C:213643 ][DFX.NA    ]: record model minst bid 29 tpc:0x12f3e data:0x0
+[C:213643 ][SPE.STAGE ]:  ROB: check retire dealloc entry 83 BPC:0x12f38 TPC:0x12f40 P0-L0-(B29-)-G0-T0-I83-ST3  TR11-UR2 sid:0 lsid:0 |BSTOP last: true rob size 6 osd size 0
+[C:213643 ][UNKNOW_CORE.NA]: Set ScalarTQueue10 Ready Table to false
+[C:213643 ][BCC.NA    ]: [LOCAL GPR PE0] ScalarTQueue report local reg retired, B29-I81-tag10-seq10
+[C:213643 ][BCC.NA    ]: [LOCAL GPR PE0] ScalarTQueue free B29-I81-G0-tag10-seq10
+[C:213643 ][DFX.NA    ]: record model minst bid 29 tpc:0x12f40 data:0x0
+[C:213643 ][SPE.STAGE ]:  commit block29 BPC:0x12f38 TPC:0x12f40 P0-L0-(B29-)-G0-T0-I83-ST3  TR11-UR2 sid:0 lsid:0 |BSTOP last: true
+[C:213643 ][SPE.STAGE ]:  full block retired dealloc entry 83BPC:0x12f38 TPC:0x12f40 P0-L0-(B29-)-G0-T0-I83-ST3  TR11-UR2 sid:0 lsid:0 |BSTOP last: true rob size 6 osd size 0
+[C:213643 ][BCC.STAGE ]: Block B29[ST3] completed
+[C:213643 ][BCC.NA    ]: [LOCAL GPR PE0] B29 commit.
+[C:213643 ][BCC.NA    ]: [LOCAL GPR PE0] B29 commit.
+[C:213643 ][BCC.STAGE ]: Block 35 retires. Remain rob size 5
+[C:213643 ][BCC.STAGE ]: BID 35 commited. stid 2
+[C:213643 ][UNKNOW_CORE.STAGE]: iex_dispatch_cmd instBPC:0x12f44 TPC:0x12f44 P0-L0-(B36-)-G0-T0-I114-ST1  TR16-UR4 sid:0 lsid:0|MSET [a3, a1, a2] last: false
+[C:213643 ][UNKNOW_CORE.STAGE]: inst dispatched to issue queue src0  R5-GP262-ready:1  src1  NonRegister0-ready:1  BPC:0x12f44 TPC:0x0 P0-L0-(B36-)-G0-T2-I115-ST2  TR16-UR4 sid:6729 lsid:0 src0:a3-P(262)-rdy,src1:0x0,->dst0:t-P(16),|addi a3, 0x0 -> t last: false
+[C:213643 ][UNKNOW_CORE.STAGE]: inst dispatched to issue queue src0  R4-GP268-ready:1  src1  NonRegister0-ready:1  BPC:0x12f44 TPC:0x4 P0-L0-(B36-)-G0-T2-I116-ST2  TR17-UR4 sid:6729 lsid:0 src0:a2-P(268)-rdy,src1:0x0,->dst0:u-P(4),|addi a2, 0x0 -> u last: false
+[C:213643 ][UNKNOW_CORE.STAGE]: inst dispatched to issue queue src0  R3-GP261-ready:1  src1  NonRegister0-ready:1  BPC:0x12f44 TPC:0x8 P0-L0-(B36-)-G0-T2-I117-ST2  TR17-UR5 sid:6729 lsid:0 src0:a1-P(261)-rdy,src1:0x0,->dst0:u-P(5),|addi a1, 0x0 -> u last: false
+[C:213643 ][DFX.NA    ]: Verify Skip Block ptr35 bpc:0x12f40 total Verified Block:6691
+[C:213644 ][BFU.NA    ]: BHC Check Stall:, stid=1, stall_fb=false, missq overflow=false
+[C:213644 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116ca P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |c.or t#2, t#1 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116ca P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |c.or t#2, t#1 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116cc P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |cmp.eqi a2, 0 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116cc P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |cmp.eqi a2, 0 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116d0 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |c.or t#2, t#1 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116d0 P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |c.or t#2, t#1 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC Get Inst: BPC:0x0 TPC:0x116d2 P0-L0-(B0-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |cmp.eqi a5, 0 -> t last: false
+[C:213644 ][BCC.F5    ]: BCC send Inst to STD PE BPC:0x116a6 TPC:0x116d2 P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:0 |cmp.eqi a5, 0 -> t last: false
+[C:213644 ][BCC.D1    ]:  BPC:0x116a6 TPC:0x116ca P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:5 src0:t#2(!renamed),src1:t#1(!renamed),->dst0:t(!renamed),|c.or t#2, t#1 -> t last: false| BPC:0x116a6 TPC:0x116cc P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:5 src0:a2(!renamed),src1:0,->dst0:t(!renamed),|cmp.eqi a2, 0 -> t last: false| BPC:0x116a6 TPC:0x116d0 P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:5 src0:t#2(!renamed),src1:t#1(!renamed),->dst0:t(!renamed),|c.or t#2, t#1 -> t last: false| BPC:0x116a6 TPC:0x116d2 P0-L0-(B40-)-G0-T0-I0-ST1  TR0-UR0 sid:0 lsid:5 src0:a5(!renamed),src1:0,->dst0:t(!renamed),|cmp.eqi a5, 0 -> t last: false|
+[C:213644 ][BCC.NA    ]: [LOCAL GPR PE0] ScalarTQueue dispatch B31-I93-tag13-seq13
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x12f44 TPC:0x1c P0-L0-(B31-)-G0-T0-I95-ST0  TR14-UR4 sid:6728 lsid:2 src0:zero,src1:t#1-P(13)-not_rdy,src2:0x40,|sdi.u zero, t#1, 0x40 last: false
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x12f44 TPC:0x20 P0-L0-(B31-)-G0-T0-I96-ST0  TR14-UR4 sid:6729 lsid:3 |BSTOP last: true
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x12f48 TPC:0x12f48 P0-L0-(B32-)-G0-T0-I97-ST0  TR14-UR4 sid:0 lsid:0|C.BSTART.STD RET last: false
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x12f48 TPC:0x12f4a P0-L0-(B32-)-G0-T0-I98-ST0  TR14-UR4 sid:0 lsid:0 src0:ra-P(5)-not_rdy,|c.setc.tgt ra last: false
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x12f48 TPC:0x12f4c P0-L0-(B32-)-G0-T0-I99-ST0  TR14-UR4 sid:0 lsid:0 |BSTOP last: true
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x1167c TPC:0x1167c P0-L0-(B33-)-G0-T0-I100-ST0  TR14-UR4 sid:0 lsid:0|BSTART.STD DIRECT, 0x12f38 last: false
+[C:213644 ][SPE.D2    ]: Rename for BPC:0x1167c TPC:0x11680 P0-L0-(B33-)-G0-T0-I101-ST0  TR14-UR4 sid:0 lsid:0 src0:0xe,->dst0:ra-P(2),|c.setret 0xe -> ra last: false
+[C:213644 ][BCC.NA    ]: [LOCAL GPR PE0] ScalarTQueue alloc B33-I102-tag14-seq14
+
+########## 各线程首现 0x116ce ##########
+STID0: C:213655 / STID1: C:213648 / STID2: C:213645 / STID3: C:213666
+
+########## 死锁检测 ##########
+[C:223711 ][DFX.NA    ]: Deadlock detected at thread 2, cycles=223712, waitCycles exceeded threshold, verified blocks=6698, verified minsts=0
+[gfsim] caught std::exception: ASSERTION FAILED: false && "Deadlock detected: simulation stalled, no new blocks committed for too long"
