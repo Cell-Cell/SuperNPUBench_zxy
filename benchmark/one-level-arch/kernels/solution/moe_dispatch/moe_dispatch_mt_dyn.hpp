@@ -181,8 +181,10 @@ void write_cumsum_flag_dyn(uint32_t* windowState)
     TSUB(sync_cf, cumsumFlag, cumsumFlag);
 
     using gm_st = global_tensor<float, RowMajor<1, TileW>>;
-    auto gs = reinterpret_cast<gm_st*>(windowState + 4);
-    TSTORE(*gs, cumsumFlag);
+    // 构造而非 reinterpret_cast：后者把零初始化的 windowState+4 当
+    // global_tensor 对象解引用，取到 NULL 基址（TSTORE GMBase=0x0）。
+    gm_st gs(reinterpret_cast<float*>(windowState + 4));
+    TSTORE(gs, cumsumFlag);
 }
 
 // ====== Flag check (tile pass-through; TCMP unavailable on the 0828
@@ -220,11 +222,12 @@ void check_cumsum_flag_mt_dyn(uint32_t* windowState, float* predBuf)
     using tile_f = Tile<Location::Vec, float, 1, TileW, BLayout::RowMajor>;
     using it_pred = global_iterator<gm_pred, tile_f>;
 
-    auto gs = reinterpret_cast<gm_st*>(windowState + 4);
+    // 同 write_cumsum_flag_dyn：正确构造，避免 reinterpret_cast 的 NULL 基址。
+    gm_st gs(reinterpret_cast<float*>(windowState + 4));
     it_pred pred_iter(predBuf);
 
     tile_f readFlag;
-    TLOAD(readFlag, *gs);
+    TLOAD(readFlag, gs);
 
     // Pipeline sync (SyncFunc<MTE2_V> aligned)
     tile_f sync_f1;
