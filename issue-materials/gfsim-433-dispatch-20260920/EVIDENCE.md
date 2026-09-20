@@ -8,6 +8,17 @@
 
 > **重要**：本文档包含对本人 2026-09-20 早前两条评论中 moe_dispatch_mt_dyn 定性的**勘误**（§2.4）——深入地址级 trace 分析后，"跨 PE 陈旧读"结论被推翻，实际根因是 **T0（leader）前端在 tile-store 块后取指跑飞、barrier(2) flag 写从未执行**。
 
+> ## ★ 最终结论（2026-09-20 定稿，详见 SuperScalarModel #765）
+>
+> **根因：前端在 0x117b2——4 字节 `BSTART.TLSU TSTORE`（0x117b0）的中间第 3 字节——起始建块**。被劈开的编码乱译出 `BSTART.STD DIRECT, 0x8207d2`（跳入栈区的垃圾直接分支），T0 于 C:15086 退休该垃圾块后**架构级跳入栈区**执行垃圾代码（零退休/零派发/零访存，BROB 空，fetch 停在 0x82c890，C:25025+ 对栈区发起指令 L2 读）；真实 TSTORE tile 命令因编码被劈开**从未形成**（全 trace 零生命周期事件），T0 永远到不了 barrier(2) flag 写 → slot 0 恒为 1（真实值）→ T1/2/3 在 .LBB2_41 互等至死锁检测（C:25108）。
+>
+> - 静态版同位置块边界干净（0x11780 = BSTART.TLSU 地址本身）→ tile 命令正常完成 → rc=0；
+> - `mega_moe_sim_mt_dyn` 同病理（四线程块全卡 0x116ce = 4 字节 `cmp.eqi` 的中间字节）；
+> - **算子侧已排除**：修复 `reinterpret_cast` NULL 基址（GMBase=0x0，`fix/moe-dispatch-dyn-cumsum-flag` 分支，gfrun 仍 R2=0）后死锁签名**逐周期不变**（C:25108 / verified blocks=1245）——根因不在 store 地址而在块边界劈开；
+> - 归类：moe_dispatch_mt_dyn / mega_moe_sim_mt_dyn → **#765**（新）；group_token_vec_mt_dyn → **#433 形态 1**（跨 PE 标量可见性，维持）。
+>
+> §2.2/§2.3 时间线中"T0 取指跑飞"的机制由此定稿；§2.4 勘误第 3 点的候选 ①（前端下一取指目标损坏）即为 #765 的劈块乱译。
+
 ---
 
 ## 1. 复现（repro.sh）
