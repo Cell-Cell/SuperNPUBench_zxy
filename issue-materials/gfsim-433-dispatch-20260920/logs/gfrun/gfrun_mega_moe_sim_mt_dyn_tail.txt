@@ -1,0 +1,41 @@
+=== tail of gfrun mega_moe_sim_mt_dyn ===
+M9824810|TPC:0x129e6  I1     T0 L0  |t:0x7                      |7                          |                           |                           |c.movi 7 -> t |bin: 0xf9d6
+M9824811|TPC:0x129e8  I2     T0 L0  |s6:0x3                     |t#1:0x7                    |x1:0x4                     |                           |sub t#1, x1 -> s6 |bin: 0x15c1885
+M9824812|TPC:0x129ec  I3     T0 L0  |t:0x109ec                  |-8192                      |                           |                           |addtpc -8192 -> t |bin: 0xffffef87
+M9824813|TPC:0x129f0  I4     T0 L0  |x1:0x3ff0000000000000      |t#1:0x109ec                |-1940                      |                           |ldi.u t#1, -1940 -> x1 |bin: 0x86cc3aa9 AccMemAddr 0x10258
+M9824814|TPC:0x129f4  I5     T0 L0  |a5:0x0                     |zero:0x0                   |                           |                           |c.movr zero -> a5 |bin: 0x3806
+
+B1426287  T0 BPC 0x129f6 [FP] [COND] BNext 0x129f6
+M9824815|TPC:0x129f6  I0     T0 L0  |None                       |0x2                        |0x3                        |0                          |BSTART.FP COND, 0x129f6 |bin: 0x3101
+M9824816|TPC:0x129fa  I1     T0 L0  |t:0x109fa                  |-8192                      |                           |                           |addtpc -8192 -> t |bin: 0xffffef87
+M9824817|TPC:0x129fe  I2     T0 L0  |t:0x3fe0000000000000       |t#1:0x109fa                |-1930                      |                           |ldi.u t#1, -1930 -> t |bin: 0x876c3fa9 AccMemAddr 0x10270
+M9824818|TPC:0x12a02  I3     T0 L0  |x1:0x3fe0000000000000      |[x1.fd]:0x3ff0000000000000 |[t#1.fd]:0x3fe0000000000000|                           |fmul [x1.fd], [t#1.fd] -> x1 |bin: 0x18aaacb
+M9824819|TPC:0x12a06  I4     T0 L0  |a5:0x1                     |a5:0x0                     |0x1                        |                           |addiw a5, 0x1 -> a5 |bin: 0x1383b5
+M9824820|TPC:0x12a0a  I5     T0 L0  |None                       |a5:0x1                     |s6:0x3                     |                           |setc.lt a5, s6 |bin: 0x113c065
+M9824821|TPC:0x12a0e  I6     T0 L0  |None                       |                           |                           |                           |C.BSTOP |bin: 0x880
+
+B1426288  T0 BPC 0x129f6 [FP] [COND] BNext 0x129f6
+M9824822|TPC:0x129f6  I0     T0 L0  |None                       |0x2                        |0x3                        |0                          |BSTART.FP COND, 0x129f6 |bin: 0x3101
+M9824823|TPC:0x129fa  I1     T0 L0  |t:0x109fa                  |-8192                      |                           |                           |addtpc -8192 -> t |bin: 0xffffef87
+M9824824|TPC:0x129fe  I2     T0 L0  |t:0x3fe0000000000000       |t#1:0x109fa                |-1930                      |                           |ldi.u t#1, -1930 -> t |bin: 0x876c3fa9 AccMemAddr 0x10270
+M9824825|TPC:0x12a02  I3     T0 L0  |x1:0x3fd0000000000000      |[x1.fd]:0x3fe0000000000000 |[t#1.fd]:0x3fe0000000000000|                           |fmul [x1.fd], [t#1.fd] -> x1 |bin: 0x18aaacb
+M9824826|TPC:0x12a06  I4     T0 L0  |a5:0x2                     |a5:0x1                     |0x1                        |                           |addiw a5, 0x1 -> a5 |bin: 0x1383b5
+M9824827|TPC:0x12a0a  I5     T0 L0  |None                       |a5:0x2                     |s6:0x3                     |                           |setc.lt a5, s6 |bin: 0x113c065
+M9824828|TPC:0x12a0e  I6     T0 L0  |None                       |                           |                           |                           |C.BSTOP |bin: 0x880
+
+B1426289  T0 BPC 0x129f6 [FP] [COND] BNext 0x129f6
+M9824829|TPC:0x129f6  I0     T0 L0  |None                       |0x2                        |0x3                        |0                          |BSTART.FP COND, 0x129f6 |bin: 0x3101
+M9824830|TPC:0x129fa  I1     T0 L0  |t:0x109fa                  |-8192                      |                           |                           |addtpc -8192 -> t |bin: 0xffffef87
+M9824831|TPC:0x129fe  I2     T0 L0  |t:0x3fe0000000000000       |t#1:0x109fa                |-1930                      |                           |ldi.u t#1, -1930 -> t |bin: 0x876c3fa9 AccMemAddr 0x10270
+M9824832|TPC:0x12a02  I3     T0 L0  |x1:0x3fc0000000000000      |[x1.fd]:0x3fd0000000000000 |[t#1.fd]:0x3fe0000000000000|                           |fmul [x1.fd], [t#1.fd] -> x1 |bin: 0x18aaacb
+M9824833|TPC:0x12a06  I4     T0 L0  |a5:0x3                     |a5:0x2                     |0x1                        |                           |addiw a5, 0x1 -> a5 |bin: 0x1383b5
+M9824834|TPC:0x12a0a  I5     T0 L0  |None                       |a5:0x3                     |s6:0x3                     |                           |setc.lt a5, s6 |bin: 0x113c065
+
+B1426290  T0 BPC 0x12a0e [FP] [FALL] BNext 0x12a0e
+M9824835|TPC:0x12a0e  I0     T0 L0  |None                       |0x2                        |0x1                        |0x0                        |C.BSTART.FP |bin: 0x880
+M9824836|TPC:0x12a10  I1     T0 L0  |t:0x3ff0000000000000       |a2:0x1099e                 |-1862                      |                           |ldi.u a2, -1862 -> t |bin: 0x8ba23fa9 AccMemAddr 0x10258
+M9824837|TPC:0x12a14  I2     T0 L0  |t:0x3ffc000000000000       |[a0.fd]:0x3fe8000000000000 |[t#1.fd]:0x3ff0000000000000|                           |fadd [a0.fd], [t#1.fd] -> t |bin: 0x1810fcb
+M9824838|TPC:0x12a18  I3     T0 L0  |a0:0x3fcc000000000000      |[t#1.fd]:0x3ffc000000000000|[x1.fd]:0x3fc0000000000000 |                           |fmul [t#1.fd], [x1.fd] -> a0 |bin: 0x15c214b
+
+B1426291  T0 BPC 0x12a1c [STD] [COND] BNext 0x12a4a
+M9824839|TPC:0x12a1c  I0     T0 L0  |None                       |46                         |                           |                           |C.BSTART.STD COND, 0x12a4a |bin: 0x174

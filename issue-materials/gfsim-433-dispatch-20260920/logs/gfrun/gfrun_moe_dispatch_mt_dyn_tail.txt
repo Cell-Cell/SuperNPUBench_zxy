@@ -1,0 +1,41 @@
+=== tail of gfrun moe_dispatch_mt_dyn ===
+M115478 |TPC:0x11c5a  I3     T0 L0  |a0:0x0                     |t#2:0x1                    |zero:0x0                   |t#1:0x7                    |csel t#2, zero, t#1 -> a0 |bin: 0xc9800177
+
+B17552  T0 BPC 0x11c5e [STD] [FALL] BNext 0x11c5e
+M115479 |TPC:0x11c5e  I0     T0 L0  |None                       |0x0                        |0x1                        |0x0                        |C.BSTART.STD |bin: 0x800
+
+B17553  T0 BPC 0x11c60 [STD] [RET] [FRET_STK] [ra ~ s3], sp! 256 BNext 0x0
+M115480 |TPC:0x11c60  I0     T0 L0  |None                       |0x100                      |0xa                        |0xe                        |FRET_STK [ra ~ s3], sp!, 0x100 |bin: 0x40e53041
+M115481 |TPC:0x11c64  I1     T0 L0  |None                       |                           |                           |                           |C.BSTOP |bin: 0xffd2
+
+B17554  T0 BPC 0x115c6 [STD] [FALL] BNext 0x115c6
+M115482 |TPC:0x115c6  I0     T0 L0  |None                       |0x0                        |0x1                        |0x0                        |C.BSTART.STD |bin: 0x800
+M115483 |TPC:0x115c8  I1     T0 L0  |t:0x1                      |a0:0x0                     |0                          |                           |cmp.eqi a0, 0 -> t |bin: 0x10fd5
+M115484 |TPC:0x115cc  I2     T0 L0  |t:0xa                      |a0:0x0                     |10                         |                           |c.addi a0, 10 -> t |bin: 0x508c
+M115485 |TPC:0x115ce  I3     T0 L0  |fp(s0):0x0                 |t#2:0x1                    |zero:0x0                   |t#1:0xa                    |csel t#2, zero, t#1 -> fp(s0) |bin: 0xc98005f7
+
+B17555  T0 BPC 0x115d2 [STD] [FALL] BNext 0x115d2
+M115486 |TPC:0x115d2  I0     T0 L0  |None                       |0x0                        |0x1                        |0x0                        |C.BSTART.STD |bin: 0x800
+M115487 |TPC:0x115d4  I1     T0 L0  |a0:0x0                     |zero:0x0                   |[fp(s0).sw]:0x0            |                           |or zero, [fp(s0).sw] -> a0 |bin: 0x2b03105
+
+B17556  T0 BPC 0x115d8 [STD] [RET] [FRET_STK] [ra ~ s4], sp! 256 BNext 0x0
+M115488 |TPC:0x115d8  I0     T0 L0  |None                       |0x100                      |0xa                        |0xf                        |FRET_STK [ra ~ s4], sp!, 0x100 |bin: 0x40f53041
+M115489 |TPC:0x115dc  I1     T0 L0  |None                       |                           |                           |                           |C.BSTOP |bin: 0x800
+
+B17557  T0 BPC 0x11368 [STD] [FALL] BNext 0x11368
+M115490 |TPC:0x11368  I0     T0 L0  |None                       |0x0                        |0x1                        |0x0                        |C.BSTART.STD |bin: 0x800
+M115491 |TPC:0x1136a  I1     T0 L0  |x1:0x5e                    |zero:0x0                   |0x5e                       |                           |addi zero, 0x5e -> x1 |bin: 0x5e00a95
+M115492 |TPC:0x1136e  I2     T0 L0  |None                       |0x1                        |                           |                           |ACRC 0x1 |bin: 0x10302b
+
+Thread:0Total Block number = 17557
+Thread:0Total Inst number = 115493
+Thread:1Total Block number = 11745
+Thread:1Total Inst number = 73002
+Thread:2Total Block number = 11745
+Thread:2Total Inst number = 73222
+Thread:3Total Block number = 11748
+Thread:3Total Inst number = 73457
+
+Total Block number = 52795
+Total Inst number = 335174
+Suaccelss to Reach the End of Benchmark! R2 = 0
