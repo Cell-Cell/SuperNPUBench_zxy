@@ -6,9 +6,9 @@
  *   - 单次运行内顺序执行 2 组运行时 shape:
  *       cfgA: tiling={bs=16, h=32, hiddenDim=64, epr=2, topK=1}
  *             — 与静态版同值, 等价回归
- *       cfgB: tiling={bs=18, h=32, hiddenDim=96, epr=2, topK=1}
- *             — bs=18%16=2 触发伪核尾分片, hiddenDim=96 覆盖运行时
- *             量化解码/GMM 维度路径
+ *       cfgB: tiling={bs=18, h=32, hiddenDim=128, epr=2, topK=1}
+ *             — bs=18%16=2 触发伪核尾分片; hiddenDim=128 覆盖运行时 GMM
+ *             维度路径 (MX 契约: hd/2 须整除 32, 原 96 不满足)
  *   - GM 缓冲按两组 shape 的最大值定长分配, 运行时只使用有效段;
  *     workspace 布局与 MegaMoeWave::Init 一致 + 尾部每 PE GMM scratch
  *     (kernel 头文件注释有完整契约);
@@ -36,17 +36,19 @@ using int64 = int64_t;
 // ---- max-shape 缓冲尺寸 (cfgA/cfgB 的逐维最大值) ----
 constexpr uint32 kBSMax = 18;
 constexpr uint32 kHMax = 32;
-constexpr uint32 kHdMax = 96;
+constexpr uint32 kHdMax = 128;
 constexpr uint32 kEprMax = 2;
 constexpr uint32 kTopKMax = 1;
+// 每 PE scratch = w1F16[epr*h*hd] + w2F16[epr*(hd/2)*h] + xf16[h] +
+// y1[hd]f32 + y2f16[hd/2] + y3[h]f32 (kernel 头文件契约)
 constexpr uint32 kWorkspaceBytes =
-    2U * kHMax * kHdMax * 4U +                             // w1 fp32
-    2U * (kHdMax / 2U) * kHMax * 4U +                      // w2 fp32
     2U * kBSMax * 4U +                                     // dispatch 表
     2U * kBSMax +                                          // mask
     kBSMax * kHMax * 4U +                                  // combine 缓冲
     16U * kEprMax * 4U +                                   // 核内统计
-    4U * (kHdMax + kHdMax / 2U + kHMax + kHMax) * 4U +     // 每 PE GMM scratch
+    4U * ((kEprMax * kHMax * kHdMax
+         + kEprMax * (kHdMax / 2U) * kHMax) * 2U           // 每 PE fp16 权重副本
+        + kHMax * 2U + kHdMax * 4U + kHdMax * 2U + kHMax * 4U) +  // GMM scratch
     4096U;
 
 // ==== GM 全局缓冲 (声明顺序 = bss 地址顺序; 全部置于高地址区 —
@@ -59,8 +61,10 @@ __attribute__((aligned(4096))) int32_t g_mmTopkIds[kBSMax * kTopKMax];
 __attribute__((aligned(4096))) float g_mmTopkWeights[kBSMax * kTopKMax];
 __attribute__((aligned(4096))) uint8_t g_mmWeight1[kEprMax * kHMax * kHdMax];
 __attribute__((aligned(4096))) uint8_t g_mmWeight2[kEprMax * (kHdMax / 2U) * kHMax];
-__attribute__((aligned(4096))) uint8_t g_mmWeightScales1[kEprMax * (kHMax * kHdMax / 32U + 4U)];
-__attribute__((aligned(4096))) uint8_t g_mmWeightScales2[kEprMax * (kHMax * kHdMax / 32U + 4U)];
+// 权重 scale (E8M0 标量, 每 expert × 每 k 组一个; kernel 解码时 TMULS 折叠):
+//   w1Scale[e][k/32] (k ∈ [0, h)), w2Scale[e][k/32] (k ∈ [0, hd/2))
+__attribute__((aligned(4096))) uint8_t g_mmWeightScales1[kEprMax * (kHMax / 32U)];
+__attribute__((aligned(4096))) uint8_t g_mmWeightScales2[kEprMax * (kHdMax / 64U)];
 __attribute__((aligned(4096))) float g_mmY[kBSMax * kHMax];
 __attribute__((aligned(4096))) int64 g_mmExpertTokenNums[kEprMax];
 __attribute__((aligned(4096))) uint8_t g_mmWorkspace[kWorkspaceBytes];
@@ -96,7 +100,9 @@ static double exp2_approx(double p)
 
 static double ref_wscale(uint8_t raw)
 {
-    const int32_t e = (int32_t)(int8_t)raw;
+    // E8M0: scale = 2^(raw-127) (issue #180: 原 (int8_t)raw 偏置解码语义错误,
+    // kernel 与 golden 一致地错所以能通过; MX 硬件路径为真 E8M0, golden 同步修正)
+    const int32_t e = (int32_t)raw - 127;
     double s = 1.0;
     if (e >= 0) {
         for (int32_t i = 0; i < e; ++i) s *= 2.0;
@@ -124,21 +130,17 @@ static double ref_fp8_e4m3(double raw)
 static double ref_w1(uint32_t e, uint32_t k, uint32_t n, uint32_t h, uint32_t hd)
 {
     const uint32_t flat = e * h * hd + k * hd + n;
-    const uint32_t group = (k * hd + n) / 32U;
-    const uint32_t scaleIdx = e * (h * hd / 32U) + group;
-    const uint8_t raw = g_mmWeight1[flat];
-    const uint8_t sc = g_mmWeightScales1[scaleIdx % ((h / 32U) * 2U * 2U * 2U)];
-    return ref_fp8_e4m3(raw) * ref_wscale(sc);
+    // 每 k 组标量 scale: w1Scale[e][k/32]
+    const uint8_t sc = g_mmWeightScales1[e * (h / 32U) + k / 32U];
+    return ref_fp8_e4m3(g_mmWeight1[flat]) * ref_wscale(sc);
 }
 
 static double ref_w2(uint32_t e, uint32_t k, uint32_t n, uint32_t h, uint32_t hd)
 {
     const uint32_t flat = e * (hd / 2U) * h + k * h + n;
-    const uint32_t group = (k * h + n) / 32U;
-    const uint32_t scaleIdx = e * ((hd / 2U) * h / 32U) + group;
-    const uint8_t raw = g_mmWeight2[flat];
-    const uint8_t sc = g_mmWeightScales2[scaleIdx % ((h / 32U) * 2U * 2U * 2U)];
-    return ref_fp8_e4m3(raw) * ref_wscale(sc);
+    // 每 k 组标量 scale: w2Scale[e][k/32] (k ∈ [0, hd/2))
+    const uint8_t sc = g_mmWeightScales2[e * ((hd / 2U) / 32U) + k / 32U];
+    return ref_fp8_e4m3(g_mmWeight2[flat]) * ref_wscale(sc);
 }
 
 // 完整 MoE 参考前向 (gen_data.compute_golden 语义, 运行时 shape; topK==1 驱动约定)
@@ -304,7 +306,9 @@ int main()
     g_mmExpertTokenNums[0] = -1;
 
     const int64_t cfgA[5] = {16, 32, 64, 2, 1};   // 与静态版同值 (等价回归)
-    const int64_t cfgB[5] = {18, 32, 96, 2, 1};   // 伪核尾分片 + 运行时 hd 路径
+    // hd=128: MX tile 契约要求 GMM2 的 K=hd/2 整除 32 (scale 组宽); 仍覆盖
+    // 伪核尾分片 (bs=18%16=2) 与运行时 hd 维度路径 (128 != cfgA 的 64)
+    const int64_t cfgB[5] = {18, 32, 128, 2, 1};
     const int64_t* cfgs[2] = {cfgA, cfgB};
 
     int failA = 0;
