@@ -67,22 +67,6 @@ static inline void mtCompilerBarrierDyn()
     __asm__ volatile("" : : : "memory");
 }
 
-// E8M0 正确解码: scale = 2^(raw-127)。
-// 注: mega_moe_sim.hpp 的 fp8_e8m0_scale 用 (int8_t)raw 偏置解码
-// (0x7F→2^127), 语义错误 (issue #180 已点名); 静态版 kernel/golden 与该
-// 错误配对自洽, 不改共享头, 本动态版用正确语义。
-static inline float e8m0_scale_dyn(uint8_t raw)
-{
-    const int32_t e = static_cast<int32_t>(raw) - 127;
-    float s = 1.0f;
-    if (e >= 0) {
-        for (int32_t i = 0; i < e; ++i) s *= 2.0f;
-    } else {
-        for (int32_t i = 0; i < -e; ++i) s *= 0.5f;
-    }
-    return s;
-}
-
 static inline void mtBarrierDyn(uint32_t phase)
 {
     mtCompilerBarrierDyn();
@@ -292,7 +276,7 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
         using DecDst = Tile<Location::Vec, __half, 32, 32>;
         for (uint32_t e = 0U; e < tilingData.moeExpertPerRank; ++e) {
             for (uint32_t k0 = 0U; k0 < tilingData.h; k0 += 32U) {
-                const float s1 = e8m0_scale_dyn(
+                const float s1 = fp8_e8m0_scale(
                     g_mmWeightScales1[e * (tilingData.h / 32U) + k0 / 32U]);
                 for (uint32_t n0 = 0U; n0 < tilingData.hiddenDim; n0 += 32U) {
                     DecSrc ws;
@@ -315,7 +299,7 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
                 }
             }
             for (uint32_t k0 = 0U; k0 < tilingData.hiddenDim / 2U; k0 += 32U) {
-                const float s2 = e8m0_scale_dyn(
+                const float s2 = fp8_e8m0_scale(
                     g_mmWeightScales2[e * ((tilingData.hiddenDim / 2U) / 32U)
                                      + k0 / 32U]);
                 for (uint32_t n0 = 0U; n0 < tilingData.h; n0 += 32U) {
