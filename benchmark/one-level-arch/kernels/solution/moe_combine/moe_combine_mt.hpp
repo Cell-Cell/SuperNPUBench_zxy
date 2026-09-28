@@ -117,18 +117,18 @@ void combine_pack_mt(DType* expandX, int32_t* expandIdx,
     }
 }
 
-// ====== #4 Flag check (tile pass-through; TCMP's 0.58.4 B.DATR syntax is
-// rejected by the 0828 toolchain asm matcher, so the EQ predicate collapses
-// to a flag->predBuf copy. predBuf consumers treat non-1.0f as "not ready";
-// the flag is 1.0f after pack, so pass-through preserves the wait semantics.
-// TSUB stands in for the removed TMOV sync, see combine_pack_mt note) ======
+// ====== #4 Flag check — 真 EQ 谓词 tile 链 (与 moe_combine_v2.hpp 同款:
+// fp32 TCMPS<EQ> 0923 基线探针实证可用, 旧 "0828 matcher 拒绝 TCMP" 的
+// pass-through 退化删除; TSEL payload 须整数 → int32 物化 + TCVT fp32;
+// 消费端 `predBuf < 0.5f` 判定对合法 flag 值等价) ======
 template <int NumExpanded, int TileW>
 void combine_check_flag_mt(float* windowFlag, float* predBuf, int slot, int t)
 {
     using namespace pto;
     using gm_flag = global_tensor<float, RowMajor<NumExpanded, TileW>>;
     using gm_pred = global_tensor<float, RowMajor<NumExpanded, TileW>>;
-    using tile_f  = Tile<Location::Vec, float, 1, TileW, BLayout::RowMajor>;
+    using tile_f  = Tile<Location::Vec, float,  1, TileW, BLayout::RowMajor>;
+    using tile_i  = Tile<Location::Vec, int32_t, 1, TileW, BLayout::RowMajor>;
     using it_flag = global_iterator<gm_flag, tile_f>;
     using it_pred = global_iterator<gm_pred, tile_f>;
 
@@ -139,12 +139,18 @@ void combine_check_flag_mt(float* windowFlag, float* predBuf, int slot, int t)
     auto gf = flag_iter(slot, t);
     TLOAD(flagTile, gf);
 
-    // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
-    tile_f sync_f1;
-    TSUB(sync_f1, flagTile, flagTile);
+    tile_f pred;
+    TCMPS<CmpMode::EQ>(pred, flagTile, 1.0f);
+    tile_i oneI;
+    TEXPANDS(oneI, static_cast<int32_t>(1));
+    tile_i selI;
+    TEXPANDS(selI, static_cast<int32_t>(0));
+    TSEL(selI, pred, oneI);
+    tile_f norm;
+    TCVT(norm, selI);
 
     auto gp = pred_iter(slot, t);
-    TSTORE(gp, flagTile);
+    TSTORE(gp, norm);
 }
 
 // ====== #1 Clear flag ======

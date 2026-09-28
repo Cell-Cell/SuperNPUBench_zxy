@@ -113,11 +113,10 @@ void combine_pack_mt_dyn(DType* expandX, int32_t* expandIdx,
     }
 }
 
-// ====== #4 Flag check (tile pass-through; TCMP's 0.58.4 B.DATR syntax is
-// rejected by the 0828 toolchain asm matcher, so the EQ predicate collapses
-// to a flag->predBuf copy. predBuf consumers treat non-1.0f as "not ready";
-// the flag is 1.0f after pack, so pass-through preserves the wait semantics.
-// TSUB stands in for the removed TMOV sync, see combine_pack_mt_dyn note) ======
+// ====== #4 Flag check — 真 EQ 谓词 tile 链 (与 moe_combine_v2.hpp 同款:
+// fp32 TCMPS<EQ> 0923 基线探针实证可用, 旧 "0828 matcher 拒绝 TCMP" 的
+// pass-through 退化删除; TSEL payload 须整数 → int32 物化 + TCVT fp32;
+// 消费端 `predBuf < 0.5f` 判定对合法 flag 值等价) ======
 template <int TileW>
 void combine_check_flag_mt_dyn(float* windowFlag, float* predBuf,
                                int64_t slot, int64_t t, int64_t numExpanded)
@@ -125,20 +124,27 @@ void combine_check_flag_mt_dyn(float* windowFlag, float* predBuf,
     using namespace pto;
     using gm_flag = global_tensor<float, RowMajor<-1, -1>>;
     using gm_pred = global_tensor<float, RowMajor<-1, -1>>;
-    using tile_f  = Tile<Location::Vec, float, 1, TileW, BLayout::RowMajor>;
+    using tile_f  = Tile<Location::Vec, float,  1, TileW, BLayout::RowMajor>;
+    using tile_i  = Tile<Location::Vec, int32_t, 1, TileW, BLayout::RowMajor>;
 
     tile_f flagTile;
     gm_flag gf(windowFlag + slot * TileW,
                static_cast<int>(numExpanded), TileW);
     TLOAD(flagTile, gf);
 
-    // #3 Pipeline sync (SyncFunc<MTE2_V> aligned)
-    tile_f sync_f1;
-    TSUB(sync_f1, flagTile, flagTile);
+    tile_f pred;
+    TCMPS<CmpMode::EQ>(pred, flagTile, 1.0f);
+    tile_i oneI;
+    TEXPANDS(oneI, static_cast<int32_t>(1));
+    tile_i selI;
+    TEXPANDS(selI, static_cast<int32_t>(0));
+    TSEL(selI, pred, oneI);
+    tile_f norm;
+    TCVT(norm, selI);
 
     gm_pred gp(predBuf + slot * TileW,
                static_cast<int>(numExpanded), TileW);
-    TSTORE(gp, flagTile);
+    TSTORE(gp, norm);
 }
 
 // ====== #1 Clear flag ======
