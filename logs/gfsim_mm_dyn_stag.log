@@ -1,0 +1,119 @@
+./bin/gfsim -f /mnt/workspace/v300_0923_tilework/linx/SuperNPUBench/benchmark/one-level-arch/output/solution/mega_moe/elf/solution_mega_moe_mega_moe_sim_mt_dyn.elf --conf fourpe -s core.bp_mode=1 -s core.deadlock_cycles=20000000 
+[gfsim] explicit PE config present; skipping ELF auto-detection
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Parse Config File:
+Override configurations:
+core.bp_mode=1
+core.deadlock_cycles=20000000
+core.threadCount=4
+core.stdPeCount=1
+core.cube_core_num=4
+core.cube_thread_num=1
+core.vec_core_num=4
+fourpe.pe_cluster_enable=true
+fourpe.pe_cluster_count=4
+fourpe.pe_cluster_frontend_thread_count=4
+fourpe.pe_cluster_aggregate_decode_width=8
+fourpe.pe_cluster_gpr_rename_partition_entries=128
+fourpe.pe_cluster_scalar_rob_partition_entries=128
+fourpe.pe_cluster_scalar_iq_partition_entries=128
+fourpe.pe_cluster_block_rob_partition_entries=256
+fourpe.pe_cluster_block_iq_partition_entries=88
+fourpe.pe_cluster_local_reg_partition_entries=88
+bfu.brq_depth=1024
+fourpe.pe_cluster_partition_borrow_enable=false
+fourpe.pe_cluster_eligible_rr_fairness_check=true
+fourpe.pe_cluster_group_contract_fatal=false
+dfx.swimCounterSampleInterval=8
+[gfsim] caught std::exception: ASSERTION FAILED: distBid < distLast
+, func SetACC, file /mnt/workspace/v300_0923/linx/SuperScalarModel/TimingSim/frontend/bctrl/BROB.cpp:1154
+stack:
+./bin/gfsim(+0x36cfa8) [0xaaaadefbcfa8]
+./bin/gfsim(+0x348360) [0xaaaadef98360]
+./bin/gfsim(+0x349220) [0xaaaadef99220]
+./bin/gfsim(+0x35659c) [0xaaaadefa659c]
+./bin/gfsim(+0x302ef4) [0xaaaadef52ef4]
+./bin/gfsim(+0x51b640) [0xaaaadf16b640]
+./bin/gfsim(+0x34c04) [0xaaaadec84c04]
+/lib/aarch64-linux-gnu/libc.so.6(+0x284c4) [0xffffaa5284c4]
+/lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x98) [0xffffaa528598]
+./bin/gfsim(+0x148ff0) [0xaaaaded98ff0]
+
+std::terminate called (unhandled exception or exception during unwinding)
+
+FATAL: gfsim received signal 6
+./bin/gfsim(+0x14911c)[0xaaaaded9911c]
+linux-vdso.so.1(__kernel_rt_sigreturn+0x0)[0xffffaab3a8dc]
+/lib/aarch64-linux-gnu/libc.so.6(+0x87608)[0xffffaa587608]
+/lib/aarch64-linux-gnu/libc.so.6(gsignal+0x1c)[0xffffaa53cb3c]
+/lib/aarch64-linux-gnu/libc.so.6(abort+0xf4)[0xffffaa527e00]
+./bin/gfsim(+0x1491c8)[0xaaaaded991c8]
+/lib/aarch64-linux-gnu/libstdc++.so.6(+0xaa570)[0xffffaa85a570]
+/lib/aarch64-linux-gnu/libstdc++.so.6(_ZSt10unexpectedv+0x0)[0xffffaa850e04]
+/lib/aarch64-linux-gnu/libstdc++.so.6(__cxa_rethrow+0x64)[0xffffaa85a984]
+./bin/gfsim(+0x36a9c)[0xaaaadec86a9c]
+/lib/aarch64-linux-gnu/libc.so.6(+0x284c4)[0xffffaa5284c4]
+/lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x98)[0xffffaa528598]
+./bin/gfsim(+0x148ff0)[0xaaaaded98ff0]
+timeout: the monitored command dumped core

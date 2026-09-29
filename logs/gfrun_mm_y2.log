@@ -1,0 +1,25 @@
+/mnt/workspace/v300_0923_tilework/linx/SuperScalarModel/bin/gfrun -f /mnt/workspace/v300_0923_tilework/linx/SuperNPUBench/benchmark/one-level-arch/output/solution/mega_moe/elf/solution_mega_moe_mega_moe_sim_mt_dyn.elf -s softcore.multiThreadNum=4 
+Memory: 0x10200 - 0x102e8 (Size=0KB) [.rodata]
+Memory: 0x102ec - 0x10307 (Size=0KB) [.eh_frame_hdr]
+Memory: 0x10308 - 0x1036b (Size=0KB) [.eh_frame]
+Memory: 0x1136c - 0x1379b (Size=9KB) [.text]
+Memory: 0x147a0 - 0x1485f (Size=0KB) [.init_array]
+Memory: 0x14860 - 0x14877 (Size=0KB) [.data.rel.ro]
+Memory: 0x16000 - 0x3c3a3 (Size=152KB) [.bss]
+Memory: 0x3d000 - 0x3e0cb (Size=4KB) [.sbss]
+Memory: 0x3e0d0 - 0x804e0d0 (Size=131136KB) [stack mem]
+Memory: 0x4000802000 - 0x4008803000 (Size=131076KB) [map mem]
+Starting PE0 from 0x1136c
+
+Thread:0Total Block number = 513135
+Thread:0Total Inst number = 7786716
+Thread:1Total Block number = 165604
+Thread:1Total Inst number = 958731
+Thread:2Total Block number = 165604
+Thread:2Total Inst number = 959285
+Thread:3Total Block number = 165606
+Thread:3Total Inst number = 959838
+
+Total Block number = 1009949
+Total Inst number = 10664570
+Suaccelss to Reach the End of Benchmark! R2 = 0
