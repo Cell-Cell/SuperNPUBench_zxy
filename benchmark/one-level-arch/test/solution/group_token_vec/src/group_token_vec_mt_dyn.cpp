@@ -111,31 +111,16 @@ static void refSortByLocalExpId(const uint32_t *topkIndex,
 
 // GM 缓冲 (verify/main 共同引用, 声明置于使用之前)
 static uint32_t topkIndex[kTopKEleNumMax + 2 * 4096];
-// topkIndex 对齐指针 = 纯立即数运算 (数组地址为链接期常量), 每次调用点就地
-// 计算。原实现为全局指针变量 (落在 .sbss, 与工具链 GlobalTensor 惰性初始化
-// 守卫变量相邻) —— gfsim 取证: 该内存槽在 cfgA 期间被相邻 16B 合并 store
-// 破坏为 0 (C9 类后端合并缺陷), cfgB 从槽读入 NULL → 全 PE tile TLOAD 基址
-// 退化为 tid*0x100 (未映射) → SL2 无响应硬停摆 (确定性冻结于 retired
-// 2,717,014)。改为栈/寄存器局部值后无共享内存槽可破坏 (4 PE 各自独立)。
-// 单输入缓冲 (两轮共用, ballast 构建实证地址血脉): cfgB 的 genTopkIndex
-// 会覆写本缓冲 → cfgA 的验证参考值改由全 PE 在 gen 后、kernel 前冗余同值
-// 预计算 (refPreCompute, 纯标量), 延迟验证只做比对 (读 per-cfg 输出缓冲),
-// 不再依赖 cfgA 输入数据。bmin 构建取证: 独立 topkIndexB (链接器落点
-// 0x28140 全局 bss 区) 上 cfgB p2_min 的全 4 PE Row=4 TLOAD 永无响应
-// (SL2 停摆 addr:0x0 ready:0, retired 170,958 冻结 14M+ cycles); 同构建
-// cfgA 在 0x19000 区的同款 TLOAD 正常 —— 输入回退单缓冲即回到实证地址。
+// topkIndex 对齐指针 = 立即数运算 (数组地址为链接期常量)。原全局指针槽
+// 会被相邻 16B 合并 store 破坏 ([C9]), 故每次调用点就地计算。单输入缓冲
+// 两轮共用: cfgB gen 覆写输入无害 —— 验证参考值在 gen 后即时预计算
+// (refPreCompute), 延迟验证只做比对。
 static inline uint32_t *topkAligned()
 {
     return (uint32_t *)(((uint64_t)topkIndex & ~0xFFFu) + 0x1000);
 }
-// .sbss 压舱槽 (sacrificial ballast): 与原 topkIndexAligned 全局指针同款
-// 声明/初始化/文件位置 —— 恢复 .sbss 内 "指针槽@+0, 工具链 GlobalTensor
-// 惰性初始化守卫@+8..." 的原始相邻布局。取证结论: 启动期构造器 store 与
-// 首个守卫 init store 相邻, 被后端合并为 16B tile store 且丢失一半 (C9 类
-// 缺陷): 原布局丢的是本槽 (无引用则良性; 旧版 kernel 读它 → NULL 基址
-// 冻结), 移除本槽后丢失落在守卫/默认元数据上 → 运行期视图元数据损坏
-// (AGU 非对齐断言)。压舱槽把丢失吸收回无害位置; kernel 一律用
-// topkAligned() 立即数运算, 永不读本槽。
+// .sbss 压舱槽: 保持启动期构造器 store 与 GlobalTensor 惰性初始化守卫的
+// 相邻布局, 把后端 16B 合并 store 的丢失吸收到无害位置 ([C9])。
 __attribute__((used)) static uint32_t *topkIndexAlignedBallast =
     (uint32_t *)(((uint64_t)topkIndex & ~0xFFFu) + 0x1000);
 
@@ -162,19 +147,16 @@ static uint32_t expertSectionTokenCntB[kExpertPerRankMax];
 static uint32_t sortedTokenIdsB[kBSMax];
 static uint32_t sectionStartsB[kExpertPerRankMax + 1];
 
-// ---- per-cfg 验证参考值 ([PE][cfg] 双下标: refPreCompute 全 PE 冗余执行
-// —— 消除 PE0 独占预计算时其余 PE 在 hist 屏障的长驱逐自旋 (refpre 取证:
-// 该前导流量窗口后首个 TLOAD 冻结); 各 PE 只写自己切片, 零共享零竞态;
-// verify (PE0 独占) 只读 [0][c] 切片) ----
+// ---- per-cfg 验证参考值 ([PE][cfg]: refPreCompute 全 PE 冗余执行, 各写
+// 私有切片零共享; verify (PE0) 只读 [0][c]) ----
 static uint32_t refExpertCnt2[kThreadsPerBlock][2][kExpertNumMax];
 static uint32_t refGroupedIds2[kThreadsPerBlock][2][kExpertPerRankMax * kBSMax];
 static uint32_t refSectionCnt2[kThreadsPerBlock][2][kExpertPerRankMax];
 static uint32_t refSortedIds2[kThreadsPerBlock][2][kBSMax];
 static uint32_t refSectionStarts2[kThreadsPerBlock][2][kExpertPerRankMax + 1];
 
-// 验证参考值预计算 (全 PE 冗余同值执行, 各写私有 [tid][c] 切片 —— 含
-// ++ 累加, 严禁跨 PE 共享目标; 必须在本轮 genTopkIndex 之后、下一轮
-// genTopkIndex 覆写输入之前执行 —— 放在 kernel 前即天然满足)。
+// 验证参考值预计算 (全 PE 冗余同值, 各写私有 [tid][c] 切片; 含 ++ 累加,
+// 严禁跨 PE 共享目标)。须在下一轮 genTopkIndex 覆写输入前执行。
 static void refPreCompute(const int64_t *tiling, uint32_t c)
 {
     const uint32_t tid = get_thread_idx();
@@ -192,9 +174,8 @@ static void refPreCompute(const int64_t *tiling, uint32_t c)
     refSortByLocalExpId(topkAligned(), refSortedIds2[tid][c], refSectionStarts2[tid][c], bs, topK, expertPerRank);
 }
 
-// 验证 (静态版 group_token_vec_mt.cpp 5 项检查同逻辑, 边界运行时化)。
-// 返回 0 = PASS; 1..5 = 静态版同款诊断码。仅比对 (参考值已由
-// refPreCompute 预计算); PE0 独占执行。
+// 验证 (静态版 5 项检查同逻辑): 仅比对 (参考值已由 refPreCompute
+// 预计算); PE0 独占。返回 0 = PASS; 1..5 = 静态版同款诊断码。
 static int verify(const int64_t *tiling, uint32_t c)
 {
     const uint32_t bs = static_cast<uint32_t>(tiling[0]);
@@ -212,8 +193,7 @@ static int verify(const int64_t *tiling, uint32_t c)
     static uint32_t verBuf[kBSMax];
     static uint32_t verRef[kBSMax];
 
-    // 参考值现算 (输入未覆写, 即时可得 —— 不做 pre-kernel 预计算,
-    // 见 main 注: 稠密标量前导是首 tile 饥饿触发器)
+    // 参考值现算 (输入未覆写, 即时可得)
     refPreCompute(tiling, c);
 
     int cntMatch = 0;
@@ -272,10 +252,8 @@ int main()
     const int64_t cfgB[5] = {517, 16, 8, 8 * 16, 2};      // 尾块 + 专家域运行时覆盖
     const int64_t *cfgs[2] = {cfgA, cfgB};
 
-    // 工具链视图惰性初始化预热: global_tensor 各实例化的 defaultShape/
-    // defaultStride + 守卫变量为函数级静态 (首次构造时初始化, 写 .sbss)。
-    // 在多 PE tile 流量开始前 (启动期, 各 PE 冗余同值) 逐一构造两轮, 把
-    // 全部惰性 init 写收敛到良性窗口 (第二轮吸收首轮可能的合并写丢失)。
+    // 视图惰性初始化预热: 在多 PE tile 流量开始前构造全部 global_tensor
+    // 实例化两轮, 把惰性 init 写收敛到良性窗口 ([C9] 合并写丢失规避)。
     {
         static uint32_t warmupBuf[64];
         for (int rep = 0; rep < 2; ++rep) {
@@ -292,15 +270,9 @@ int main()
         }
     }
 
-    // 单输入 + per-cfg 输出 + 即时验证 (ballast 实证血脉): 关键差异
-    // 修订 —— 不设 pre-kernel 参考值预计算段: refpre/stag 取证显示,
-    // refPreCompute 的稠密标量前导 (每 PE ~150K 块) 触发 l1d_refill
-    // _unmatched refill 丢弃洪流 (C:581987-584781), 随即首条 tile TLOAD
-    // (gen:1) 进入 L2 INST_BUF 永不派发 (SL2 viz 轨迹实证) —— 稠密标量
-    // 前导窗口是首 tile 饥饿的确定性触发器。参考值改由 verify 内部现算
-    // (输入未覆写, 即时可得)。cfgA 验证后 worker 在 mtBarrier(6) 自旋,
-    // 验证结束才进入 cfgB gen; kernel B 末端屏障后 worker 直接退出
-    // (零等待), PE0 独占验 cfgB。
+    // 单输入 + per-cfg 输出 + 即时验证: 参考值由 verify 内部现算 (输入
+    // 未覆写); cfgA 验证后 worker 在 mtBarrier(6) 自旋, 验证结束才进入
+    // cfgB gen; kernel B 末端屏障后 worker 直接退出, PE0 独占验 cfgB。
     int failA = 0;
     for (int c = 0; c < 2; ++c) {
         // Input init runs redundantly on every PE (deterministic, identical
@@ -311,13 +283,8 @@ int main()
                      static_cast<uint32_t>(cfgs[c][3]) *
                          static_cast<uint32_t>(cfgs[c][4]));
 
-        // L1D 预暖 pass (首 tile 饥饿修复): 顺序触碰 topkIndex 全部行,
-        // 使 hist 阶段每 PE 8K 稠密标量读全部命中私有 L1D → L2 prior
-        // 流量归零 → 首条 scatter TLOAD 到达安静 L2 而可派发。stag/drain/
-        // X1 取证: hist 冷读流在首 TLOAD 时刻持续占满 prior 路径, L2 的
-        // prior 绝对优先调度使 tile 派发静默饿死 (INST_BUF 永驻); ballast
-        // 靠时序间隙侥幸。预暖自身的 miss 流发生在无 tile 请求在飞的安全
-        // 窗口; 4 PE 各自预热私有 L1D (同值冗余, 值弃用)。
+        // L1D 预暖 pass: 顺序触碰 topkIndex 全部行使 hist 稠密标量读命中
+        // 私有 L1D, 首条 scatter TLOAD 到达安静 L2 (4 PE 各自预热)。
         {
             volatile uint32_t warmAcc = 0u;
             const uint32_t warmElems = static_cast<uint32_t>(cfgs[c][0]) *
@@ -342,9 +309,8 @@ int main()
 
         BENCHEND;
 
-        // cfgA 即时验证 (PE0 独占; 诊断码记下, 不在循环内早退 ——
-        // worker 仍在 mtBarrier(6) 自旋, 早退会造成互等死锁);
-        // worker 在验证期间于汇合点自旋 (ballast 实证该窗口可存活)。
+        // cfgA 即时验证 (PE0 独占; 诊断码记下不早退 —— worker 仍在
+        // mtBarrier(6) 自旋, 早退会互等死锁)。
         if (c == 0) {
             if (tid == 0U) {
                 failA = verify(cfgs[0], 0u);

@@ -10,54 +10,13 @@
 // MoE Token Grouping — Multi-thread Vector (Tile) variant, runtime DYNAMIC
 // SHAPE version
 //
-// 基于 group_token_vec_mt.hpp 的动态 shape 版: 三阶段算子语义与分片模型
-// 完全一致, 唯一区别是 bs/topK/expertPerRank/expertPerPod/superPodNum
-// 编译期不可知, 运行期由 tiling 指针传入, 全部切分参数运行期计算。
-//
-//   tiling = {bs, topK, expertPerRank, expertPerPod, superPodNum}   (int64)
-//   expertNum = expertPerPod * superPodNum;  topkEleNum = bs * topK
-//
-// 设计对照 quant/dynamic_mx_quant_*_dyn (动态入口范式):
-//   · physical tile 形状仍编译期锁定 (Phase1/2/3a 每 PE 4×kTileN 行块,
-//     归约目的 tile [32×1,v4×1], 原子/散射链 [1×32,v1×4] 行向量 —— 契约
-//     [C4]/[C8] 见 gt_tile_common.hpp); 计数/散射链一律静态 valid, 尾块
-//     (bs%16 行 / bs%32 元素) 标量兜底 ([C6] 动态 valid 链泄漏 lane)。
-//   · global_iterator 依赖编译期 RowStride, 全部改为运行时构造的
-//     global_tensor<RowMajor<-1,-1>> (ctor 传运行时 rows/cols), 基址按
-//     运行时维度手动计算。
-//   · tile 路径 (直方图/散射/归约全链) 仅在 topK == kTileN 且
-//     expertPerRank ≤ kEprCap 且 superPodNum ≤ kSpnCap 时启用 (tile 列宽
-//     与 topK 绑定 + 静态 scratch 容量); 违例走纯标量兜底。
-//   · Phase2 尾块 token 轮转归属 PE (tail 行 r → PE r%4), 保证每 PE
-//     token 数 ≤ ceil(bs/4) = driver 段容量 kBsPerPE。
-//   · 编译期定长栈数组 (dstPodLocal / counts / writePos) 改为 GM scratch
-//     入参: podScratch 需 4 * superPodNum 个 uint32 (每 PE tid 切片),
-//     sortScratch 需 2 * expertPerRank 个 uint32 (counts + writePos)。
-//   · PE 分片/私有段尺寸全部运行时 ceil 计算:
-//       kBsPerPE = (bs + 3) / 4; 专家域归约 (Phase1 reduce) 用运行时 ceil
-//     分片 (前 rem 个 PE 多 1), 按 1×32 tile 分块 + 尾部标量。
-//
-// tile 指令链 (与静态 mt 版同款, 全链 gfsim 兼容 [C12]; 探针双门禁实证。
-// 原 MSCATTER_ADD/MGATHER_ADD 方案仅 gfrun 可用 —— TimingSim TLSU 无 GM
-// 原子族完成路径, 已替换为等价 tile 链):
-//   Phase1  计数链直方图 ([C10]): TLOAD + 每 bin TCMPS<EQ>+TSEL+TCOLSUM+
-//           TROWSUM+TSTORE→标量寄存器累加; reduce = 4×TLOAD + TADD 链 +
-//           TSTORE; 尾块标量兜底
-//   Phase2  TREMS+TROWMIN / TDIVS+TCMPS+TSEL+TROWMAX (pod) / [4×4] 成对
-//           比较 rank ([C11]: TROWEXPAND+TCOLEXPAND+TCMP+TSEL(∧TTRI)+
-//           TROWSUM, 稳定序) / 平 MGATHER(写指针查表) / TMULS+TADD+TSHLS /
-//           TCI / 平 MSCATTER ×(1+spn) / 块末计数链进位; 尾块轮转标量兜底
-//   Phase3a TLOAD + TREMS + TROWMIN + TSTORE (原有)
-//   Phase3b 计数链 counts + 标量前缀和 + [32×32] 成对 rank + 平 MGATHER
-//           (writePos) + TCI + 平 MSCATTER + per-tile 计数链进位 (稳定序
-//           = 标量逐元素一致); 尾部标量兜底
-//   barrier 单调相位编号 (per-PE 调用计数, 免跨 PE 复位 —— gfsim 活锁修复)
-//
-// 其余与静态版相同的约定 (详见 group_token_vec_mt.hpp):
-//   · 每个 TLOAD 结果经 tile op 消费, 结果经 TSTORE/MSCATTER 出 tile 域,
-//     标量读回只打 GM (extract_vector_elt 后端崩溃规避);
-//   · 每 PE tile 不相交: PE tid 拥有 16 行块内 [4*tid, 4*tid+4) 行;
-//   · 跨 PE 交接由 mtBarrier 保护 (相位 1/2/3 与静态版一致)。
+// 动态 shape 版 (语义与分片模型同 group_token_vec_mt.hpp): bs/topK/
+// expertPerRank/expertPerPod/superPodNum 运行期由 tiling 传入; tile 物理
+// 形状仍编译期锁定 (契约 [C4]/[C6]/[C8]/[C12] 见 gt_tile_common.hpp)。
+// 直方图 = 计数链 [C10]; rank = 成对比较 [C11] + 平 MGATHER/MSCATTER;
+// 原子族等价链替换 (TimingSim TLSU 无 GM 原子完成路径)。tile 路径仅
+// topK == 16 / epr ≤ 8 / spn ≤ 2 时启用, 违例与尾块走标量兜底;
+// 跨 PE 交接由 mtBarrier 单调相位保护 (per-PE 调用计数, 免跨 PE 复位)。
 // ============================================================================
 
 constexpr uint32_t kThreadsPerBlock = 4;
@@ -69,24 +28,10 @@ constexpr uint32_t kSpnCap = 2;   // superPodNum ≤ 2 (driver kSuperPodNumMax)
 constexpr uint32_t kExpertNumCap = 256;  // expertNum ≤ 256 (计数链 acc 栈数组)
 
 // ============================================================================
-// Multi-PE barrier —— 单行 flag + 定向集驱逐自旋 (gfsim 跨 PE 可见性规避)
-//
-// 原单行 volatile flag 热自旋在时序模型下活锁 (ROOTCAUSE_gfsim §6.4 +
-// 本轮取证 retired 346% 判据): 标量 load 命中私有 L1D (64KB, 256 set ×
-// 4 way × 64B) 返回缓存副本; 远端 PE 的 flag store 不会失效本 PE 的
-// L1D 副本 (标量路径无跨 PE snoop/失效机制, 模型 spec 四处标注 fence
-// TODO)。长偏斜屏障 (PE0 独占 merge/verify) 期间等待方对 flag 行的热
-// 自旋使该行永不被驱逐 → 永远读陈旧值 → 互等活锁。
-//
-// 修复 (纯算子侧): 自旋每 32 次热轮询后做一轮"定向集驱逐"—— 读 5 条与
-// flag 行同 L1D set 的 dummy 行 (跨距 16KB = L1D 全域, 5 > 4-way 必驱逐
-// 该 set 全部way, 含 flag 行) → 下一次 flag 轮询必为 L1D miss → 从共享
-// L2/内存重取新值。写方同样在自旋中驱逐自己的脏 flag 行 → 回写使 L2
-// 变新。双向收敛, 且驱逐流量比重副本全扫描方案低 ~2 个数量级 (规避
-// 时序模型 L1D refill 记账在高压 miss 流下的 unmatched 丢弃缺陷 ——
-// 实测 2048 副本全扫描方案触发 4.7K 次 l1d_refill_unmatched 洪流并
-// 硬停摆; 兄弟算子 PASS 运行该计数仅 0~6)。
-// gfrun 功能模型无缓存 → 驱逐读为无害冗余读, 语义与原屏障一致。
+// Multi-PE barrier —— 单行 flag + 寄存器延迟链 + 稀疏定向集驱逐
+// (时序模型跨 PE 无 snoop: flag 行须主动驱逐使 L1D miss 才能看到新值;
+// 驱逐流量须稀疏, 否则 prior 洪泛饿死 L2 tile 派发)。gfrun 无缓存, 语义同
+// 原始屏障。
 // ============================================================================
 alignas(16384) static volatile uint32_t sEvictSpan[6 * 4096];   // 96KB 驱逐区
 alignas(64) static volatile uint32_t sPhaseDone[kThreadsPerBlock];  // 4 flag 同一行
@@ -117,30 +62,18 @@ static inline void mtBarrier(uint32_t phase)
     const uint32_t wordOff =
         (static_cast<uint32_t>(
              reinterpret_cast<uint64_t>(&sPhaseDone[0]) >> 2)) & 4095u;
-    // 定向集驱逐自旋 + 跳过自己的槽: PE0 独占 merge/3b 造成 ~500K cycles
-    // 偏斜自旋 (ballast 构建实证本方案可存活); 纯 plain 热自旋在该偏斜下
-    // 触发陈旧 flag 可见性活锁 (retired 346% 判据)。每 32 次热轮询读 5 条
-    // 与 flag 行同 L1D set 的 dummy 行 (跨距 16KB = L1D 全域, 5>4way 必
-    // 驱逐) → 下次轮询必 miss → 从共享 L2 重取新值。跳自槽消除同地址
-    // store→load 对 (nuke 触发源)。
+    // 定向集驱逐自旋 + 跳自槽: 纯 plain 热自旋在长偏斜下读陈旧 flag 活锁,
+    // 须周期性驱逐 flag 行所在 set 迫使 miss 重取新值; 跳自槽消除同地址
+    // store→load 对。
     for (uint32_t t = 0; t < kThreadsPerBlock; ++t) {
         if (t == tid) {
             continue;
         }
         uint32_t spins = 0x9E3779B9u ^ (phase * 2654435761u) ^ (t * 0x85EBCA6Bu);
         while (sPhaseDone[t] < phase) {
-            // 寄存器驻留延迟链 + 稀疏驱逐 (首 tile 饥饿自锁环修复 v2):
-            // sl2viz_x2 取证 —— 卡在 ROB 头的首条 TLOAD 未派发期间, 等待
-            // 方的自旋 (旧: 每轮 flag 读 + 每 32 轮 5 驱逐读; 栈上计数
-            // 器也参与 miss) 在 4 PE 下合成每 cycle 1 条的永续 prior 流
-            // (12 地址轮转, 10K/10K cycles 恒定), L2 的 prior 绝对优先
-            // 调度 (DispatchTagRequest/ScheduleTagIngress) 使 tile 派发
-            // 静默饿死 → TLOAD 永不完成 → 自旋永不结束 → 自锁。
-            // v2: 延迟链全程寄存器 (+r asm 防折叠, 零内存流量; 栈上
-            // volatile 计数器是 v1 失败根因 —— 其栈行 miss 仍供流), flag
-            // poll 命中 L1D 零流量; 驱逐降频至 1/64 轮 (5 条/轮)。prior
-            // 流量降至 ~1 条/数百 cycles/PE, L2 出现大段空闲, TLOAD 派发
-            // 解锁; 可见性由写方到达驱逐 + 稀疏驱逐后的 poll miss 保证。
+            // 寄存器驻留延迟链 + 稀疏驱逐: 驱逐读是 prior 流量, 过密会饿死
+            // L2 tile 派发, 故延迟链全程寄存器 (零内存流量) + 驱逐降频
+            // 1/64 轮; 可见性由写方到达驱逐 + 稀疏驱逐后的 poll miss 保证。
             spins = spins * 2654435761u + 0x2545F491u;
             spins = spins * 2654435761u + 0x2545F492u;
             spins = spins * 2654435761u + 0x2545F493u;
@@ -169,16 +102,9 @@ static inline void mtBarrier(uint32_t phase)
 }
 
 // ============================================================================
-// Phase 1 (Tile + multi-thread, runtime shape): 每 PE 不相交 [4×16] 静态
-// tile + MSCATTER_ADD 直方图; 尾块/非 16 列走标量兜底。
-//
-// 与静态 mt 版同款链 (契约 [C1..C9] 见 gt_tile_common.hpp):
-//   满块: TLOAD [4×16 静态 valid] → TCMPS<GE> 守卫 (value 置零/index 钳 0,
-//   cntLocal 切片无 scratch 桶空间) → TSHLS(<<2) → MSCATTER_ADD(myCnt)
-//   尾块 (bs%16 行, per-PE vr 切片): 动态 ValidRow 链会按物理行泄漏 lane
-//   ([C6]), 计数不可 tile → 保留 TLOAD 预取 + 标量直方图 (原实现)。
-//   归约: 每 PE 负责 expertNum/4 个专家, 按 1×32 tile 分块:
-//   TLOAD ×4 (各 PE 切片) + TADD ×3 + TSTORE; 尾部 (<32 专家) 标量。
+// Phase 1 (runtime shape): 满块标量计数 (hybrid) + 尾块标量兜底; 归约按
+// 专家段分片 (≤64/PE, 标量读回)。全 tile 计数链保留给静态 mt 版 (dyn
+// 形状下回边 TMOV 描述符断言/依赖 TLOAD 超时, 见静态版注释)。
 // ============================================================================
 static inline void calTokenPerExpertCnt_mt_tile_dyn(
     uint32_t *topkIndex,
@@ -193,11 +119,8 @@ static inline void calTokenPerExpertCnt_mt_tile_dyn(
     const uint32_t tid = get_thread_idx();
 
     uint32_t *myCnt = cntLocal + tid * expertNum;
-    // myCnt 清零: volatile 标量 (≤256 u32 = 1KB, ~256 指令可忽略)。
-    // 原 16×8 TEXPANDS(0)+TSTORE 方案在 gfsim fourpe 第二轮调用 (cfgB)
-    // 冻结: 常量 0 填充被后端折叠为零寄存器别名绑定 (BCC 转储源 tile
-    // TileTag:0/addr:0x0), TLSU 永不完成该 TSTORE → 全流水停摆 (gfrun
-    // 功能模型无此约束, 单轮调用亦不触发 —— 时序模型 + 重复调用特有)。
+    // 清零用 volatile 标量: 常量 TEXPANDS(0)+TSTORE 被后端折叠为零寄存器
+    // 别名绑定, cfgB 重复调用时 TSTORE 永不完成 ([C9])。
     {
         volatile uint32_t *v = myCnt;
         for (uint32_t i = 0; i < expertNum; i++) v[i] = 0u;
@@ -207,27 +130,11 @@ static inline void calTokenPerExpertCnt_mt_tile_dyn(
         using GmPerPE = global_tensor<uint32_t, RowMajor<-1, -1>>;
 
         const uint32_t fullBlocks = bs / kTileM;
-        // 计数链直方图 ([C10], gfsim 兼容; 替代 MSCATTER_ADD —— TimingSim
-        // 无 TLSU 原子族 [C12]): 每块 TLOAD 一次, 每 bin e: TCMPS<EQ>+TSEL+
-        // TCOLSUM([4×16]→[1×16])+TROWSUM(→[1×1])+TSTORE→标量寄存器累加。
-        // bin 循环天然限定合法值域 (无需守卫); 谓词循环内 tile 全部重物化
-        // (无 loop-carried tile —— TMOV/U8 谓词重载束规避)。
-        // dyn 满块直方图 = 驻留 TLOAD (tile DMA) + 标量计数 (hybrid)。
-        // 全 tile 计数链在 dyn 形状下不可行的实测依据:
-        //   a) 外 bin 内 block (零 loop-carried tile): cfgB 256 bin × 32 块
-        //      = 8192 次依赖 TLOAD/PE → gfsim >10.6M cycles 未完成 (超时);
-        //   b) 外 block 内 bin (t 驻留): 回边 TMOV bank 重排束跨形状寄存器
-        //      复用 → 模型 "Local TMOV requires matching descriptors" 断言
-        //      (mt 静态/单 PE 版分配器恰好避开, 保留全 tile 计数链并 gfsim
-        //      PASS; dyn 形状组合更多, 无法稳定避开)。
-        // 标量计数为每 PE ~2K 迭代 (cfgB), gfsim ~30K cycles, 可忽略。
+        // dyn 满块直方图 = 标量计数 (hybrid; 全 tile 计数链在 dyn 形状下
+        // 受模型 TMOV 断言/依赖 TLOAD 超时限制, 静态版保留全 tile 链)。
+        // 满块 TLOAD 预取已删除 (无消费者, 语义不变, 块数下降)。
         for (uint32_t blk = 0; blk < fullBlocks; ++blk) {
-            // rows [16*blk + 4*tid, +4): 标量计数 (hybrid)。
-            // 原满块 TLOAD [4×16] "DMA 预取" 已删除 (与尾块同款处理):
-            // 数据由标量经 GM 读, 预取 tile 无消费者 —— 无消费 dst 的
-            // TLOAD 在时序模型 lazy-bind 路径下是纯开销且疑似绑定授权
-            // 泄漏源 (gfsim 硬停摆转储: 后续 TLOAD dst addr:0x0 ready:0
-            // 永不完成); 删除后语义不变, 块数下降。
+            // rows [16*blk + 4*tid, +4): 标量计数 (hybrid)
             const uint32_t r0 = blk * kTileM + tid * 4U;
             for (uint32_t row = 0; row < 4U; ++row) {
                 const uint32_t base = (r0 + row) * topK;
@@ -277,19 +184,11 @@ static inline void calTokenPerExpertCnt_mt_tile_dyn(
         }
     }
 
-    // 全部 PE 的直方图 (myCnt 导出) 完成后, reduce 才可读其它 PE 的
-    // cntLocal 切片 —— 原实现把 reduce 放在调用方 barrier 之前, 是真实的
-    // 跨 PE 顺序竞争 (ROOTCAUSE_gfsim §6.3 "注释与代码矛盾, 应修");
-    // gfrun 靠确定性 lockstep 侥幸, gfsim 真实 PE 偏斜下读到未完成计数。
+    // 直方图导出完成后才可读其它 PE 的 cntLocal (否则为真实跨 PE 竞争)。
     mtBarrier(histBarrierPhase);
 
-    // Reduce: PE tid 负责专家段 [tid*epn, +epn) —— 标量读回 (gfsim 兼容
-    // 契约 [C14]): 原 4×TLOAD [1×32]+TADD×3+TSTORE tile 归约在时序模型下
-    // 硬停摆 (两次独立取证: 四 PE 同停 reduce 首条 TLOAD, rdy:1/ready:0
-    // 永不完成, retired 冻结) —— cntLocal 行刚被各 PE 标量 volatile 导出,
-    // 屏障后立即被 tile 路径读取, 跨域 (scalar store → tile load) 即时读
-    // 触发 TMA 管线停摆; 标量读回同款跨 PE reduce 为已证 PASS 模式
-    // (moe_dispatch mt/mt_dyn gfsim 通过)。elen ≤ 64, 标量成本可忽略。
+    // Reduce: PE tid 负责专家段 [tid*epn, +epn) —— 标量读回 ([C14]:
+    // 屏障后的 scalar store → tile load 即时读触发 TMA 管线停摆)。
     const uint32_t eseg = expertNum / kThreadsPerBlock;
     const uint32_t erem = expertNum % kThreadsPerBlock;
     const uint32_t ebegin = tid * eseg + (tid < erem ? tid : erem);
@@ -305,18 +204,14 @@ static inline void calTokenPerExpertCnt_mt_tile_dyn(
 }
 
 // ============================================================================
-// dyn noinline tile 分体 (mega_moe_gmm 纪律: 每个函数完整包含 tile 链,
-// tile 寄存器不跨函数边界, 函数间只经 GM 交接 —— 调用点无活跃 tile,
-// 消除 raw tile spill 与跨形状回边 TMOV 描述符断言两类模型缺口)
+// dyn noinline tile 分体: 每个函数完整包含 tile 链, 寄存器不跨函数边界,
+// 函数间只经 GM 交接 (消除 raw tile spill 与跨形状回边 TMOV 断言)。
 // ============================================================================
 
-// P2-ab (合并分体): minLocalExpId + pod any-flag —— 单次 TLOAD [4×16] 供给
-// 两条链 (min: TREMS→TROWMIN→TSTORE; pod: TDIVS 一次 + 每 p 守卫直线段
-// TCMPS<EQ>→TSEL→TROWMAX→TSTORE, kSpnCap=2 展开, 无循环回边 → 无 TMOV 束)。
-// 合并动机 (bmin/refpre 取证): 原 p2_min 与 pod_flags 对同一 [4×16] 行块
-// 各自 TLOAD (每 PE 每块 3 条同址 256B tile_load, 4 PE 共 12 条打同一
-// 1KB 窗口相邻行), Streaming L2 后端对整批 issued 请求永无响应 (LIQ 条目
-// age 20M cycles, addr 有效 tileRdy=1); 合并后每 PE 每块仅 1 条。
+// P2-ab (合并分体): minLocalExpId + pod any-flag —— 单次 TLOAD [4×16] 供
+// 给两条链 (min: TREMS→TROWMIN→TSTORE; pod: TDIVS + 每 p 守卫直线段
+// TCMPS<EQ>→TSEL→TROWMAX→TSTORE)。合并后每 PE 每块 1 条 TLOAD (原
+// p2_min+pod_flags 分体为 3 条同址读)。
 __attribute__((noinline)) static inline void gt_dyn_p2_min_pods(
     const uint32_t *topkIndex, uint32_t r0, uint32_t topk, uint32_t batchSize,
     uint32_t expertPerRank, uint32_t expertPerPod, uint32_t superPodNum,
@@ -700,14 +595,8 @@ static inline void groupToken_mt_tile_dyn(
 }
 
 // ============================================================================
-// Host-side merge (scalar, single-PE, runtime shape)
-//
-// 保持 PE0 独占 (不分布式化 —— A/B 实证: 4 PE 并发标量读刚被 MSCATTER
-// 写入的 perPe* 缓冲 (跨域 tile写→标量读 + 跨 PE 同区并发) 在时序模型
-// 触发早期硬停摆 (retired 66K/146K 冻结); PE0 独占版在 ballast 构建中
-// 完整跑过该阶段。其 ph+3 偏斜自旋 (~500K cycles) 由定向集驱逐屏障
-// 承接 (ballast 构建实证可存活); 唯一杀死 ballast 构建的 driver 验证
-// 长自旋 (~1M cycles) 已由 driver 侧延迟验证+双缓冲消除。
+// Host-side merge (scalar, single-PE, runtime shape) —— PE0 独占 (分布式
+// 并发标量读 tile 刚写入的 perPe* 缓冲会在时序模型触发硬停摆)。
 // ============================================================================
 static inline void mergeGroupTokenResults_dyn(
     const uint32_t *perPegroupedIds,
@@ -954,27 +843,16 @@ static inline void runGroupTokenVecMTDyn(
     if (bs == 0 || topK == 0 || expertPerRank == 0 ||
         expertPerPod == 0 || superPodNum == 0) return;
 
-    // 单调相位编号 (gfsim 活锁修复): 原 driver 在两次 cfg 调用之间清零
-    // sPhaseDone —— 那是无同步的跨 PE 写, 时序模型下若某 PE 的清零晚于
-    // 另一 PE 对下一轮 barrier 的置位, flag 被抹掉 → 双方永久互等自旋
-    // (ROOTCAUSE 判定的唯一真失败)。改为 per-PE 私用调用计数 sInvCnt
-    // (每 PE 只读写自己的槽, 零跨 PE 写), 相位 = inv*8 + k 跨调用单调
-    // 递增 → 陈旧 flag 天然失效, 复位彻底删除。契约同值判定保证各 PE
-    // 的 inv 序列一致。
-    // 步长 8: kernel 相位 = inv*8+1..5 (hist/scatter/merge 汇合/sort/
-    // exit), driver 验证汇合 = 6 (仅 c==0, worker 在 PE0 验证 cfgA 期间
-    // 自旋); 第二轮 = 9..13。严格单调 (与原 driver=4 的旧注不同 —— 该
-    // 相位已让位给 kernel ph+3 merge 汇合屏障)。
+    // 单调相位编号: per-PE 私用调用计数 sInvCnt, 相位 = inv*8 + k 跨调用
+    // 单调递增, 无跨 PE 复位写 (清零晚于置位会抹掉 flag → 互等自旋)。
+    // kernel 相位 = inv*8+1..5, driver 验证汇合 = 6, 第二轮 = 9..13。
     static uint32_t sInvCnt[kThreadsPerBlock];   // bss 零初始化 = 首轮 inv 0
     const uint32_t inv = sInvCnt[tid];
     sInvCnt[tid] = inv + 1u;
     const uint32_t ph = inv * 8u;
 
-    // 相位分配 (步长 8, driver 汇合点 8c+5 严格落在两轮之间):
-    //   ph+1 = 直方图完成 (calTokenPerExpertCnt 内部, reduce 读 cntLocal 前)
-    //   ph+2 = 散射段完成 (PE0 merge 读 perPe* 前)
-    //   ph+3 = merge 完成 (sort tile 流量与 PE0 merge 标量流量错相)
-    //   ph+4 = floorFunc 完成 (sortKernel 内部, PE0 3b 读 minLocalExpIds 前)
+    // 相位分配 (步长 8): ph+1 直方图完成; ph+2 散射段完成;
+    // ph+3 merge 完成; ph+4 floorFunc 完成; ph+5 全部输出写完
     //   ph+5 = 全部输出写完 (任何 PE 离开 kernel 前)
     calTokenPerExpertCnt_mt_tile_dyn(topkIndex, tokenPerExpertCnt, cntLocal,
                                      expertNum, bs, topK, ph + 1u);
@@ -988,9 +866,8 @@ static inline void runGroupTokenVecMTDyn(
                                    groupedTokenIds, tokenSuperPodInfo, expertSectionTokenCnt,
                                    expertPerRank, superPodNum, bs);
     }
-    // 汇合 (ph+3): 全 PE 等 PE0 merge 完成后才进 sortKernel —— worker 的
-    // sort tile TLOAD 若落在 PE0 merge 稠密标量流量窗口, 触发与首 tile
-    // 同族的 L2 饥饿 (ballast 家族取证)
+    // 汇合 (ph+3): 全 PE 等 PE0 merge 完成后才进 sortKernel (避免 sort
+    // tile 流量与 merge 标量流量并发)
     mtBarrier(ph + 3u);
 
     sortKernel_mt_tile_dyn(topkIndex, minLocalExpIds, sortedTokenIds, sectionStarts,

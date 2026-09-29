@@ -201,13 +201,9 @@ static void compute_golden(double* yRef, int64* tokRef, uint32 bs, uint32 h, uin
 }
 
 // ---- 确定性数据生成 (各 PE 冗余执行, 同值写无需栅栏; 运行时 shape) ----
-// genInputs —— 按 PE 连续分片写 (单写者/缓存行)。
-// 原实现为 4 PE 冗余同值全量写: 时序模型私有 L1D 无跨 PE 一致性, 同一行
-// 在 4 个 L1D 中各持发散脏副本, 第二轮调用 (cfgB 重写同批行) 与 tile 读
-// 路径叠加后触发 SL2 无响应硬停摆 (gfsim 取证: 四头 TMA TLOAD/TSTORE
-// rdy:1 永不完成, retired 冻结)。分片后每行仅一个 PE 写 (数据逐位不变:
-// 所有公式按元素确定, LCG 链每 PE 空转到自己切片起点), 调用方在
-// genInputs 之后、kernel 之前加 mtBarrierDyn(8c+1) 汇合。
+// genInputs —— 按 PE 连续分片写 (单写者/缓存行; 4 PE 冗余同值全量写会在
+// cfgB 与 tile 读叠加时触发 SL2 硬停摆)。调用方在 kernel 前
+// mtBarrierDyn(8c+1) 汇合。
 static void genInputs(uint32 bs, uint32 h, uint32 hd)
 {
     const uint32 tid = get_thread_idx();
@@ -367,11 +363,9 @@ int main()
         mega_moe::mega_moe_sim_mt_dyn_kernel(y, x, tokenNumsOut, cfgs[c]);
         BENCHEND;
 
-        // 即时验证 (plainspin 实证流程 + M2 解码修复): kernel 末端屏障
-        // (8c+4) 已保证全 PE 输出就绪; PE0 独占验证本轮 (仅 c==0), 其余
-        // PE 在 8c+5 汇合点自旋等待 (plainspin 构建实证该窗口可存活;
-        // 延迟验证的备份/恢复大标量拷贝环在 m2 构建实证触发停摆)。验证
-        // 完成后才进入下一轮 genInputs (避免覆写竞争)。
+        // 即时验证: kernel 末端屏障 (8c+4) 保证全 PE 输出就绪; PE0 独占
+        // 验证本轮 (仅 c==0), 其余 PE 在 8c+5 汇合点自旋; 验证完成后才
+        // 进入下一轮 genInputs (避免覆写竞争)。
         if (c == 0 && tid == 0U) {
             failA = verify(cfgs[0][0], cfgs[0][1], cfgs[0][2]);
         }

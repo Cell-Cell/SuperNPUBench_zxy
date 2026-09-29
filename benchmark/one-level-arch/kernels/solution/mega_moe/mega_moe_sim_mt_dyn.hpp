@@ -188,10 +188,8 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
     const uint32_t yScratchOffset = statsOffset + kBlockAivNum * tilingData.moeExpertPerRank * 4U;
     uint8_t* const yScratchBase = g_mmWorkspace + yScratchOffset
                                 + tid * perPeBytes;
-    // M2 (decode 冻结根因: 4 PE 冗余地对同一权重 tile 同址 TLOAD, SL2 对该
-    // 形态永不响应, dst addr:0x0): 解码按 tile 扁平索引分片 (每 tile 仅 1 PE
-    // 读写), 目标缓冲改共享 (PE0 区); per-PE scratch 偏移不变 (权重区退化为
-    // 填充), GMM 读共享副本 (decode 栅栏后可见)。
+    // M2: 解码按 tile 扁平索引分片 (每 tile 仅 1 PE 读写), 目标缓冲改共享
+    // (PE0 区); per-PE scratch 偏移不变, GMM 读共享副本 (decode 栅栏后可见)。
     __half* const w1F16 = reinterpret_cast<__half*>(
         g_mmWorkspace + yScratchOffset);
     __half* const w2F16 = w1F16
@@ -253,13 +251,8 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
 #else
     // ============ 完整真机流水 — 真 4PE 分片执行 (运行期 dims) ============
     // ---- 阶段 1: 输入准备 (各 PE 写域不相交) ----
-    // SendAndQuantBuffInit (9731): 统计槽清零 — 每 PE 只清自己 4 个伪核
-    // (4*epr 连续 i32 ≤ 8 元素 = 32B < 128B tile 粒度下限)。
-    // 原 mm_fill_i32 (常量 0 TEXPANDS+TSTORE) 在时序模型第二轮调用 (cfgB)
-    // 硬停摆 (gfsim 转储实证: 四头之一 TSTORE <Col=32,ValidCol=8,S32> rdy:1
-    // 永不完成, retired 冻结) —— 常量 0 填充被后端折叠为零寄存器别名绑定,
-    // TLSU 永不完成该 TSTORE (gtv mt_dyn 同款缺陷已有注释放); 改 volatile
-    // 标量逐元素清零 ([C9] 规避合并), 语义不变。
+    // SendAndQuantBuffInit: 统计槽清零。volatile 标量逐元素 ([C9]: 常量
+    // TEXPANDS+TSTORE 被折叠为零寄存器别名绑定, cfgB 重复调用永不完成)。
     {
         int32_t* stats = reinterpret_cast<int32_t*>(g_mmWorkspace + statsOffset);
         volatile int32_t* vs = stats + tid * kCoresPerPE * tilingData.moeExpertPerRank;
@@ -270,23 +263,12 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
     }
     // QuantizeLocalTokens (3754): MX 路径原地消费 E4M3+E8M0 权重 —— 不再有
     // fp32 解码 workspace 与对应的跨 PE 栅栏 (issue #180: 解码阶段整体删除)
-    // GatherAndSendExpertMasks (3934): 自回环本地 mask 表 —— PE0 独占全量
-    // 构建 (单写者)。m2/eager 取证: 按 PE 分片时 PE0/PE1 的 [1×32 VC=8]
-    // TLOAD 落同一 64B 行 (0x1a000/0x1a020), 并发发射触发 Streaming L2
-    // 后端永无响应 (PE0 首条 TLOAD gen:1 卡死 20M cycles, worker 解码屏障
-    // 自旋至 164% retired); 错峰 pad 环又因小块洪泛加剧 park/replay
-    // (SetACC 断言重掷骰)。PE0 独占后: 零并发同行 tile 读, VC=8/VC=4
-    // 分片形态消失 (全量 nSlots=bs*topK → VC=16 块 + 标量尾), 且无 pad
-    // 环。mask 全表 ≤ 36 slot, PE0 独占代价可忽略; 消费前可见性由 ph+2
+    // GatherAndSendExpertMasks: 自回环本地 mask 表, PE0 独占全量构建
+    // (单写者; bs ≤ 36, tile 链无收益, 且该 TLOAD 为模型首 tile 派发缺陷
+    // 的受害者, 见 TILE_GFSIM_COMPLETION_REPORT.md rev4)。可见性由 ph+2
     // 屏障保证 (topK!=1 时 helper 标量兜底不变)。
     {
         uint8_t* mask = g_mmWorkspace + maskOffset;
-        // mask 构建全标量化 (Y1): bs ≤ 36 个元素, tile 链无收益; 且 routing
-        // TLOAD 是 eager 家族构建 cfgB 首 tile 饥饿的确定性受害者
-        // (m2/eager/pe0route 三构建取证: 该 [1×32 VC=8/16] topkIds TLOAD
-        // 进 INST_BUF 永不派发)。标量环 (纯 prior 路径, 实证无此缺陷)
-        // 后, kernel 首条 tile 请求变成 M2 分片解码 (m2 构建 20M cycles
-        // 实证可存活)。
         if (tid == 0U) {
             for (uint32_t s = 0; s < tilingData.bs; ++s) {
                 const int32_t expert = g_mmTopkIds[s];
@@ -295,12 +277,8 @@ static inline void mega_moe_sim_mt_dyn_kernel(float* yOut, float* xIn,
         }
         mtBarrierDyn(ph + 2U);
     }
-    // ResetDispatchWorkspace (4051) = DispatchBuffInit: dispatch 表填 -1 —
-    // token 分片; 每 e 的 PE 段连续。改 volatile 标量逐元素填充 ([C9] 同族):
-    // 原 mm_fill_f32 常量 TEXPANDS+TSTORE 在 cfgB 冻结 (Y1 取证: PE0 头
-    // TSTORE <Col=32,ValidCol=8,FP32> TileTag:62 gen:1 addr:0x0 永不完成,
-    // retired 1,659,638; 与统计清零的 [C9] 常量 tile 折叠缺陷同源)。nTok
-    // ≤ 8, 标量代价可忽略。
+    // ResetDispatchWorkspace = DispatchBuffInit: dispatch 表填 -1。
+    // volatile 标量逐元素填充 ([C9] 同族: 常量 TSTORE cfgB 冻结)。nTok ≤ 8。
     {
         float* dispatch = reinterpret_cast<float*>(g_mmWorkspace + dispatchOffset);
         const uint32_t tokBegin = tid * kCoresPerPE * perCore;
