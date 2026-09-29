@@ -62,10 +62,10 @@ constexpr uint32_t kMtThreadsPerBlockDyn = 4U;
 
 // 屏障 = 单行 flag 自旋, 跳过自己的槽 (自己刚写过, 程序序保证 >= phase):
 // 消除自旋窗口内 "同地址 store→load" 对 (nuke/存储序重放的主要触发源 ——
-// mega 含 CUBE ACC 链, 重放会二次 SetACC 撞 BROB.cpp:1154 断言, gfsim
-// 实测; gtv 无 CUBE 故其定向集驱逐版安全, mega 不用驱逐读)。
-// 跨 PE 可见性: mega 各相位偏斜中等 (mt 静态版同型 plain 自旋 gfsim
-// PASS 2,010,999 佐证), 若后续实测活锁再引入驱逐读。
+// plain 自旋在最新模型上于 8c+5 汇合点实测活锁 (4 PE 同 BPC 互等, retired
+// 1,653,850 冻结) —— 时序模型跨 PE 无 snoop, flag 行须周期驱逐迫使 L1D
+// miss 才见新值。改为定向集驱逐自旋 + 写方到达驱逐 (与 gt/mc 同款协议)。
+alignas(16384) static volatile uint32_t sMtEvictSpanDyn[6 * 4096];
 alignas(64) static volatile uint32_t sMtPhaseDoneDyn[kMtThreadsPerBlockDyn];
 
 static inline void mtCompilerBarrierDyn()
@@ -79,11 +79,23 @@ static inline void mtBarrierDyn(uint32_t phase)
     const uint32_t tid = get_thread_idx();
     sMtPhaseDoneDyn[tid] = phase;
     mtCompilerBarrierDyn();
+    const uint32_t wordOff =
+        (static_cast<uint32_t>(
+             reinterpret_cast<uint64_t>(&sMtPhaseDoneDyn[0]) >> 2)) & 4095u;
+    for (uint32_t k = 1U; k <= 5U; ++k) {
+        (void)sMtEvictSpanDyn[k * 4096u + wordOff];   // 写方到达驱逐
+    }
     for (uint32_t t = 0U; t < kMtThreadsPerBlockDyn; ++t) {
         if (t == tid) {
             continue;   // 自己的槽: 本函数刚写入 phase, 无需轮询
         }
+        uint32_t spins = 0U;
         while (sMtPhaseDoneDyn[t] < phase) {
+            if ((++spins & 31u) == 0u) {
+                for (uint32_t k = 1U; k <= 5U; ++k) {
+                    (void)sMtEvictSpanDyn[k * 4096u + wordOff];
+                }
+            }
         }
     }
     mtCompilerBarrierDyn();

@@ -382,6 +382,7 @@ int main()
     // 诊断码优先级保持原语义 (failA 优先)。
     int rcB = verify(cfgs[1][0], cfgs[1][1], cfgs[1][2]);
 
+#ifndef MEGA_MT_DYN_DIAG_NO_FINISHER
     // gfsim 判读通道: test-finisher (0x10009000, 低 16 位 0x5555 = PASS)
     volatile uint32_t* finisher = reinterpret_cast<volatile uint32_t*>(0x10009000ULL);
     if (failA != 0) {                              // cfgA: 静态版同款诊断码
@@ -394,4 +395,10 @@ int main()
     }
     *finisher = 0x0001;
     return 10 + rcB;                               // cfgB: +10 偏移诊断码
+#else
+    // 诊断变体 (模型团队 issue #880 协作): 去掉 finisher MMIO 写, 4 PE 均
+    // 正常 return 走 _end 退出 syscall; PE0 返回码保留 (0 = PASS)。
+    if (failA != 0) return failA;
+    return rcB == 0 ? 0 : 10 + rcB;
+#endif
 }

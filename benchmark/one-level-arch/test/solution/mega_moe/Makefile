@@ -24,6 +24,12 @@ ifeq ($(SIM_FAKE), 1)
 DEFINES += -DMEGA_MOE_SIM_FAKE
 endif
 
+# 诊断变体 (issue #880 协作): 移除 finisher MMIO 写, 4 PE 正常退出,
+# PE0 返回码保留 —— make TESTCASE=mega_moe_sim_mt_dyn DIAG_NO_FINISHER=1
+ifeq ($(DIAG_NO_FINISHER), 1)
+DEFINES += -DMEGA_MT_DYN_DIAG_NO_FINISHER
+endif
+
 ifeq ($(TESTCASE),mega_moe_sim)
 SRC_FILE += $(TEST_ROOT)/$(CASE_SRC_DIR)/mega_moe_sim.cpp
 TARGET = $(ELF_HEAD)_$(TESTCASE)_BS$(BS)_H$(H)_HD$(HIDDEN).elf

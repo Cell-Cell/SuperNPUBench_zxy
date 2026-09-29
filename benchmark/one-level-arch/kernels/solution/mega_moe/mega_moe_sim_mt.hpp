@@ -28,9 +28,8 @@
  *                                 PE0 验证依赖全量输出
  *   - tile 计算核心 (类型/解码/GEMV/SwiGLU/拷贝) 由 mega_moe_sim.hpp 的
  *     "四a、tile 计算核心" 共享段提供 (与 sim / sim_mt_dyn 同源)。
- *   - mtBarrier 为 volatile per-PE phase flags + compiler barrier, 与
- *     kernels/solution/moe_dispatch / kernels/solution/moe_combine / group_token_vec_mt
- *     同一约定。
+ *   - mtBarrier 为 volatile per-PE phase flags + 定向集驱逐自旋 (跨 PE
+ *     无 snoop 时的可见性协议, 与 gt/mc 同款)。
  *
  * 运行契约 (与 _mt 系列一致): 必须
  *     gfrun -f <elf> -s softcore.multiThreadNum=4
@@ -46,7 +45,8 @@ namespace mega_moe {
 // ============================================================================
 constexpr uint32_t kMtThreadsPerBlock = 4U;
 
-static volatile uint32_t sMtPhaseDone[kMtThreadsPerBlock];
+alignas(16384) static volatile uint32_t sMtEvictSpan[6 * 4096];
+alignas(64) static volatile uint32_t sMtPhaseDone[kMtThreadsPerBlock];
 
 static inline void mtCompilerBarrier()
 {
@@ -56,10 +56,23 @@ static inline void mtCompilerBarrier()
 static inline void mtBarrier(uint32_t phase)
 {
     mtCompilerBarrier();
-    sMtPhaseDone[get_thread_idx()] = phase;
+    const uint32_t tid = get_thread_idx();
+    sMtPhaseDone[tid] = phase;
     mtCompilerBarrier();
+    const uint32_t wordOff =
+        (static_cast<uint32_t>(
+             reinterpret_cast<uint64_t>(&sMtPhaseDone[0]) >> 2)) & 4095u;
+    for (uint32_t k = 1U; k <= 5U; ++k) {
+        (void)sMtEvictSpan[k * 4096u + wordOff];   // 写方到达驱逐
+    }
     for (uint32_t t = 0U; t < kMtThreadsPerBlock; ++t) {
+        uint32_t spins = 0U;
         while (sMtPhaseDone[t] < phase) {
+            if ((++spins & 31u) == 0u) {
+                for (uint32_t k = 1U; k <= 5U; ++k) {
+                    (void)sMtEvictSpan[k * 4096u + wordOff];
+                }
+            }
         }
     }
     mtCompilerBarrier();
