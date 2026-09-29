@@ -38,9 +38,11 @@ namespace supernpu::tile_isa {
 
 constexpr int kCombineMtThreads = 4;
 
-// Multi-PE barrier: volatile per-PE phase flags + compiler memory barrier,
-// same convention as kernels/solution/group_token_vec/group_token_vec_mt.hpp.
-static volatile uint32_t sCombineMtPhaseDone[kCombineMtThreads];
+// Multi-PE barrier: per-PE phase flags + 定向集驱逐自旋 (时序模型跨 PE 无
+// snoop, flag 行须周期驱逐迫使 L1D miss 才见新值; 纯热自旋在部分布局下
+// 活锁)。写方到达即驱逐自身脏 flag 行, 等待方每 32 轮驱逐一次。
+alignas(16384) static volatile uint32_t sCombineMtEvictSpan[6 * 4096];
+alignas(64) static volatile uint32_t sCombineMtPhaseDone[kCombineMtThreads];
 
 static inline void combineMtCompilerBarrier()
 {
@@ -50,10 +52,23 @@ static inline void combineMtCompilerBarrier()
 static inline void combineMtBarrier(uint32_t phase)
 {
     combineMtCompilerBarrier();
-    sCombineMtPhaseDone[get_thread_idx()] = phase;
+    const uint32_t tid = get_thread_idx();
+    sCombineMtPhaseDone[tid] = phase;
     combineMtCompilerBarrier();
+    const uint32_t wordOff =
+        (static_cast<uint32_t>(
+             reinterpret_cast<uint64_t>(&sCombineMtPhaseDone[0]) >> 2)) & 4095u;
+    for (uint32_t k = 1; k <= 5; ++k) {
+        (void)sCombineMtEvictSpan[k * 4096u + wordOff];   // 写方到达驱逐
+    }
     for (int t = 0; t < kCombineMtThreads; ++t) {
+        uint32_t spins = 0;
         while (sCombineMtPhaseDone[t] < phase) {
+            if ((++spins & 31u) == 0u) {
+                for (uint32_t k = 1; k <= 5; ++k) {
+                    (void)sCombineMtEvictSpan[k * 4096u + wordOff];
+                }
+            }
         }
     }
     combineMtCompilerBarrier();
@@ -269,6 +284,13 @@ void moe_combine_mt_dyn(DTypeIn* expandX, float* expertScales,
     if (bs <= 0 || h <= 0 || k <= 0 || numExpanded <= 0) return;
     if (h % TileW != 0) return;   // 列维 tile 宽度 (列 valid 必须编译期)
 
+    // 单调相位: per-PE 调用计数 (免 driver 跨 PE 复位 —— 复位晚于置位会
+    // 抹掉 flag 造成互等自旋)。kernel 相位 = inv*4+1/+2, driver 汇合 = inv*4+3。
+    static uint32_t sCombineMtInvCnt[kCombineMtThreads];
+    const uint32_t inv = sCombineMtInvCnt[tid];
+    sCombineMtInvCnt[tid] = inv + 1u;
+    const uint32_t ph = inv * 4u;
+
     // #5 Window State Init (InitWinState aligned) — PE0 only
     if (tid == 0) {
         uint32_t dataState = windowState[0];
@@ -280,13 +302,13 @@ void moe_combine_mt_dyn(DTypeIn* expandX, float* expertScales,
     // ====== Phase 1: Pack (expandX → window + flag) ======
     combine_pack_mt_dyn<DTypeIn, TileW>(
         expandX, expandIdx, windowData, windowFlag, h, k, numExpanded);
-    combineMtBarrier(1);
+    combineMtBarrier(ph + 1u);
 
     // ====== Phase 2: Reduce (window → weighted sum → out) ======
     combine_reduce_mt_dyn<DTypeIn, DTypeOut, TileW>(
         expertScales, windowData, windowFlag, predBuf, out,
         bs, h, k, numExpanded);
-    combineMtBarrier(2);
+    combineMtBarrier(ph + 2u);
 
     // Window state writeback — PE0 only
     if (tid == 0) {

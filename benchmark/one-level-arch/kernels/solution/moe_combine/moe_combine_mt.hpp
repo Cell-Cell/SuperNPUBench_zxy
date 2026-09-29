@@ -40,9 +40,11 @@ namespace supernpu::tile_isa {
 
 constexpr int kCombineMtThreads = 4;
 
-// Multi-PE barrier: volatile per-PE phase flags + compiler memory barrier,
-// same convention as kernels/solution/group_token_vec/group_token_vec_mt.hpp.
-static volatile uint32_t sCombineMtPhaseDone[kCombineMtThreads];
+// Multi-PE barrier: per-PE phase flags + 定向集驱逐自旋 (时序模型跨 PE 无
+// snoop, flag 行须周期驱逐迫使 L1D miss 才见新值; 纯热自旋在部分布局下
+// 活锁)。写方到达即驱逐自身脏 flag 行, 等待方每 32 轮驱逐一次。
+alignas(16384) static volatile uint32_t sCombineMtEvictSpan[6 * 4096];
+alignas(64) static volatile uint32_t sCombineMtPhaseDone[kCombineMtThreads];
 
 static inline void combineMtCompilerBarrier()
 {
@@ -52,10 +54,23 @@ static inline void combineMtCompilerBarrier()
 static inline void combineMtBarrier(uint32_t phase)
 {
     combineMtCompilerBarrier();
-    sCombineMtPhaseDone[get_thread_idx()] = phase;
+    const uint32_t tid = get_thread_idx();
+    sCombineMtPhaseDone[tid] = phase;
     combineMtCompilerBarrier();
+    const uint32_t wordOff =
+        (static_cast<uint32_t>(
+             reinterpret_cast<uint64_t>(&sCombineMtPhaseDone[0]) >> 2)) & 4095u;
+    for (uint32_t k = 1; k <= 5; ++k) {
+        (void)sCombineMtEvictSpan[k * 4096u + wordOff];   // 写方到达驱逐
+    }
     for (int t = 0; t < kCombineMtThreads; ++t) {
+        uint32_t spins = 0;
         while (sCombineMtPhaseDone[t] < phase) {
+            if ((++spins & 31u) == 0u) {
+                for (uint32_t k = 1; k <= 5; ++k) {
+                    (void)sCombineMtEvictSpan[k * 4096u + wordOff];
+                }
+            }
         }
     }
     combineMtCompilerBarrier();
