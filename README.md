@@ -7,8 +7,9 @@
 
 ## 目录
 
-- group_token_old/  (2)
-- group_token_vec/  (3)
-- mega_moe/         (3)
-- moe_combine/      (3)
-- moe_dispatch/     (3)
+- <op>/            14 个 .elf（按算子分目录）
+- disasm/<op>/     全量反汇编（llvm-objdump -d，同名 .diss）
+- syms/<op>/       符号表（llvm-nm -n，同名 .syms）
+
+用例清单: group_token_old(2) / group_token_vec(3) / mega_moe(3) /
+moe_combine(3) / moe_dispatch(3)。
